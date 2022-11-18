@@ -5,6 +5,7 @@ import ProtocolModem as proto
 #사람의 접근을 감지했다고 가정
 detect_result = True
 
+# 작성 예정
 
 
 
