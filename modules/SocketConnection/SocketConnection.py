@@ -159,7 +159,10 @@ class SocketClient(threading.Thread):
             self.my_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.my_socket.connect((self.host, self.port))
         except ConnectionRefusedError:
-            log('호스트로부터 연결이 거부되었습니다. 서버가 열려있는지 또는 동일 네트워크에 연결되어있는지 확인하십시오.', self)
+            log('호스트로부터 연결이 거부되었습니다. 서버가 열려있는지 확인하십시오.', self)
+            return
+        except TimeoutError:
+            log('해당 주소로부터 응답이 없습니다. 호스트 장치가 동일 네트워크에 연결되어있지 않거나 올바르지 않은 주소입니다.', self)
             return
             
         log(f'host[{self.host}] 에 연결되었습니다.', self)
@@ -178,15 +181,18 @@ class SocketClient(threading.Thread):
                 data: 보낼 데이터
             Return
                 성공시 True, 실패시 False
-        '''        
+        '''
+        if self.connect_state == False: return
+
         try:
             self.my_socket.sendall(data.encode())
             return True
-        except ConnectionAbortedError:
+        except ConnectionResetError :
             log(f'host[{self.host}] 와(과)의 연결이 끊겼습니다.', self)
             self.connect_state = False
             self.my_socket.close()
         return False
+
 
     def next(self) -> str:
         '''
@@ -252,9 +258,13 @@ def receive(socket_object, target_ip):
                 log(f'{name}[{addr}]: {decoded}', socket_object)
 
         except ConnectionResetError:
-            if type(socket_object.connections) == dict:
-                del socket_object.connections[name]
-            else:
+            try:
+                if type(socket_object.connections) == dict:
+                    del socket_object.connections[name]
+
                 socket_object.connect_state = False
-            log(f'{name}[{addr}] 와(과)의 연결이 종료되었습니다.', socket_object)
-            log(f'접속 수: {len(socket_object.connections)}', socket_object)
+                log(f'{name}[{addr}] 와(과)의 연결이 종료되었습니다.', socket_object)
+                log(f'접속 수: {len(socket_object.connections)}', socket_object)
+            except Exception as e:
+                pass
+            return
