@@ -4,7 +4,7 @@ from SocketConnection import SocketClient, local_ip
 
 print('장치 ip:', local_ip())   #실행 장치의 ip출력
 
-socket_client = SocketClient(host='192.168.0.13', port=20000, debug=False)
+socket_client = SocketClient(host='192.168.0.13', port=20000, debug=True)
 socket_client.start()
 
 try:
