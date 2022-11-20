@@ -9,12 +9,14 @@ my_server.start()
 
 try:
     while True:
-        message = input()
+        msg = input() 
 
-        if message == '!next':  #!next를 입력하면 수신 버퍼에서 가져와 출력함
+        if msg == '!next':  #!next를 입력하면 수신 버퍼에서 가져와 출력함
             print('next message:', my_server.next())
+        elif msg == '!list':    #!list를 입력하면 현재 접속된 주소를 반환함
+            print('who connected: ', my_server.connectors())
         else:
-            my_server.send(message, 'desktop')  #일반 입력은 메시지 보내기
+            my_server.broadcast(msg)  #일반 입력 모든 Client에게 전송
 
 except KeyboardInterrupt:
     pass
