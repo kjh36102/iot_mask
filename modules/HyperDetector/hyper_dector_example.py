@@ -15,13 +15,14 @@ my_hyper = HyperDetector(
         echo_pin=23, 
         trig_pin=24,
         name='myhyper',
-        #interval=0.1,
-        #weight=20,  # 둔감도
-        #debug=True,
-        #accept_range=20 # detect_point로부터의 인식 반경
+        #debug=True
     )
-#my_hyper.set_accept_range(20)
+
+# my_hyper.interval = 0.1
+# my_hyper.weight = 20
+
 my_hyper.set_detect_point(60)
+my_hyper.set_accept_range(20)
 
 my_hyper.start()
 
