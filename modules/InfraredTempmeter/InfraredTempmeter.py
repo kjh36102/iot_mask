@@ -1,5 +1,6 @@
 import smbus
 import time
+import threading
 
 #CRC table (오류 검출용, 변경하면 안됨)
 crc8_table = [         
@@ -67,24 +68,39 @@ def calc_temp(raw_temp):
 
 #================================================================================
 
-def start_measure():
-    print('start measure..')
-    try:
+class InfraredTempmeter(threading.Thread):
+    def __init__(self, i2c_addr=I2C_ADDR):
+        super().__init__(daemon=True)
+
+        self.i2c_addr = i2c_addr
+        self.stop_flag = True
+
+        self.current_sensor_temp = 0
+        self.current_object_temp = 0
+
+    def run(self):
+        print('InfraredTempmeter: start measuring')
         while True:
-            sensor_temp = read(SENSOR_ADDR)
-            time.sleep(1)
-            object_temp = read(OBJECT_ADDR)
+            while not self.stop_flag:
+                sensor_temp = read(SENSOR_ADDR)
+                time.sleep(1)
+                object_temp = read(OBJECT_ADDR)
 
-            if sensor_temp[0] == True and object_temp[0] == True:
-                sensor_temp = calc_temp(sensor_temp[1])
-                object_temp = calc_temp(object_temp[1])
-                print('sensor_temp: {:.2f}, object_temp: {:.2f}'.format(sensor_temp, object_temp))
-            else:
-                print('error')
-    except KeyboardInterrupt:
-        pass
-    print('end')
-        
+                if sensor_temp[0] == True and object_temp[0] == True:
+                    self.current_sensor_temp = calc_temp(sensor_temp[1])
+                    self.current_object_temp = calc_temp(object_temp[1])
+                    print('sensor_temp: {:.2f}, object_temp: {:.2f}'.format(self.current_sensor_temp, self.current_object_temp))
+                else:
+                    print('InfraredTempmeter: error on run()')
+            time.sleep(0.5)
+    
+    def start(self):
+        if self.stop_flag == True:
+            super().start()
+            self.stop_flag = False
 
-if __name__ == '__main__':
-    start_measure()
+    def stop(self):
+        self.stop_flag = True
+    
+    def peek(self):
+        return (self.current_sensor_temp, self.current_object_temp)
