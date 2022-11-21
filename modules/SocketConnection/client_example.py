@@ -4,7 +4,7 @@ from SocketConnection import SocketClient, local_ip
 
 print('장치 ip:', local_ip())   #실행 장치의 ip출력
 
-socket_client = SocketClient(host='192.168.0.13', port=20000, debug=True)
+socket_client = SocketClient(host='192.168.0.8', port=20000, debug=True)
 socket_client.start()
 
 try:
@@ -16,7 +16,7 @@ try:
         elif msg == '!list':    #!list를 입력하면 현재 접속된 주소를 반환함
             print('who connected: ', socket_client.connectors())
         else:
-            socket_client.send(msg, target_ip='192.168.0.13') #타겟 주소로 메시지 전송
+            socket_client.send(msg, target_ip='192.168.0.8') #타겟 주소로 메시지 전송
 
 except KeyboardInterrupt:
     pass

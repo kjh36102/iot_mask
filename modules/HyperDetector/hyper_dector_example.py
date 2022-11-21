@@ -1,5 +1,10 @@
 #초음파 센서로 물체를 감지해 LED를 켜는 예시코드
 
+PIN_HYPER_RIGHT_ECHO 		= 8
+PIN_HYPER_RIGHT_TRIG 		= 7
+PIN_HYPER_LEFT_ECHO 		= 23
+PIN_HYPER_LEFT_TRIG 		= 24
+
 import RPi.GPIO as GPIO
 from HyperDetector import HyperDetector
 import time
@@ -7,49 +12,33 @@ import time
 GPIO.setmode(GPIO.BCM)
 GPIO.setwarnings(False)
 
-led_pin = 8
+hyper_detector = HyperDetector()
+hyper_detector.register('left', PIN_HYPER_LEFT_ECHO, PIN_HYPER_LEFT_TRIG, 20, 10)
+hyper_detector.register('right', PIN_HYPER_RIGHT_ECHO, PIN_HYPER_RIGHT_TRIG, 50, 20)
 
-GPIO.setup(led_pin, GPIO.OUT)
-
-my_hyper = HyperDetector(
-        echo_pin=23, 
-        trig_pin=24,
-        name='myhyper',
-        #debug=True
-    )
-
-# my_hyper.interval = 0.1
-# my_hyper.weight = 20
-
-my_hyper.set_detect_point(60)
-my_hyper.set_accept_range(20)
-
-my_hyper.start()
+hyper_detector.start()
 
 print('센서 안정화중...')
-GPIO.output(led_pin, False)
-time.sleep(3)
+time.sleep(1)
 
 try:
     while True:
-        print('\tavg: ', my_hyper.get_avg_value()) 
-        detect = my_hyper.detect()
+            print(f'avg_left: {hyper_detector.get_avg_value("left")}, avg_right: {hyper_detector.get_avg_value("right")}')
+                
+            left_detect = hyper_detector.detect("left")
+            right_detect = hyper_detector.detect("right")
 
-        if detect: 
-            print('detected!')
-            GPIO.output(led_pin, True)
-        else: 
-            print('vanished!')
-            GPIO.output(led_pin, False)
-        
-        time.sleep(0.5)
+            print(f'            {left_detect}                     {right_detect}')
+
+            GPIO.output(21, left_detect)
+            GPIO.output(20, right_detect)
+
+            time.sleep(0.2)
 
 except KeyboardInterrupt:
-    my_hyper.stop()
-
+    pass
 
 print('main end')
-GPIO.cleanup()
 
 
 

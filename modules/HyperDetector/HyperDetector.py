@@ -1,121 +1,111 @@
-#HyperDetector.py
+# #HyperDetector.py
 
-import threading as th
+import sys
+sys.path.append('./modules/StopableThread')
+
+from StopableThread import StopableThread
 import RPi.GPIO as GPIO
 import time
 
-class HyperDetector(th.Thread):
-    def __init__(self, echo_pin:int, trig_pin:int, name:str='no_name', debug:bool=False):
-        '''
-        HyperDetector의 생성자
-        Args
-            echo_pin: 음파 발생 핀
-            trig_pin: 반향 감지 핀
-            name: 센서 이름 (디버깅 목적)
-            debug: 디버그 여부
-        '''
+class HyperDetector(StopableThread):
+    def __init__(self):
         super().__init__()
-        self.daemon = True
 
-        #------------------------------------
-        self.stop_flag = False
-        self.measure_list = []
+        #--------------------------------
         self.measure_cursor = 0
-        self.weight = 20
-        self.interval = 0.1
-        self.echo_pin = echo_pin
-        self.trig_pin = trig_pin
-        self.name = name
-        self.detect_point = None
-        self.accept_range = 20
-        self.detect_state = False
-        self.debug = debug
-        #------------------------------------
-        
-        for i in range(self.weight):
-            self.measure_list.append(0)
-
-        GPIO.setup(echo_pin, GPIO.IN)
-        GPIO.setup(trig_pin, GPIO.OUT)
-
-        GPIO.output(trig_pin, False)
+        self.weight = 10
+        self.interval = 0.2
+        self.detectors = {}
+        self.register_cnt = 0
+        #--------------------------------
     
     def __del__(self):
-        GPIO.cleanup([self.echo_pin, self.trig_pin])
+        #GPIO cleanup
+        for name in self.detectors:
+            detector = self.detectors[name]
+            echo = detector['echo']
+            trig = detector['trig']
 
-    def run(self):
-        while not self.stop_flag:        
-            GPIO.output(self.trig_pin, True)
-            time.sleep(0.00001)
-            GPIO.output(self.trig_pin, False)
+            GPIO.cleanup([echo, trig])
 
-            while GPIO.input(self.echo_pin) == 0:
-                    start = time.time()
-            while GPIO.input(self.echo_pin) == 1:
-                    stop = time.time()
+    def register(self, name, echo, trig, detect_point, accept_range):
+        self.detectors[name] = {
+            'name': name,
+            'trig': trig,
+            'echo': echo,
+            'detect_point': detect_point,
+            'accept_range': accept_range,
+            'detect_state': False,
+            'measure_list': []
+        }
+
+        #GPIO 초기화
+        GPIO.setup(echo, GPIO.IN)
+        GPIO.setup(trig, GPIO.OUT)
+        GPIO.output(trig, False)
+
+        #measure_list 초기화
+        for i in range(self.weight):
+            self.detectors[name]['measure_list'].append(0)
+        
+        self.register_cnt += 1
+
+    def loop(self):
+        for name in self.detectors:
+            detector = self.detectors[name]
+
+            GPIO.output(detector['trig'], True)
+            time.sleep(0.000000001)
+            GPIO.output(detector['trig'], False)
+
+            while GPIO.input(detector['echo']) == 0: start = time.time()
+            while GPIO.input(detector['echo']) == 1: stop = time.time()
 
             measured_time = stop - start
             distance = measured_time * 34300 / 2
 
-            if self.__is_in_range(self.detect_point, self.accept_range, distance) and self.detect_state == False:
-                self.measure_list = [self.detect_point for i in range(self.weight)]
-                self.detect_state = True
-
-            if self.measure_cursor >= self.weight:
-                self.measure_cursor = 0
-
-            self.measure_list[self.measure_cursor] = round(distance, 2)
-
-            self.measure_cursor += 1
-
-            if self.debug: 
-                print('{0} 의 거리: {1:.1f} cm'.format(self.name, distance))
-                print('{0} 의 List: '.format(self.name), end='')
-                print(self.measure_list, end='\n\n')
+            if self.__is_in_range(detector['detect_point'], detector['accept_range'], distance) and detector['detect_state'] == False:
+                detector['measure_list'] = [distance for i in range(self.weight)]
+                detector['detect_state'] = True
+            else:
+                detector['detect_state'] = False
             
-            time.sleep(self.interval)
+            detector['measure_list'][self.measure_cursor] = distance
+
+            time.sleep(self.interval / self.register_cnt)
+
         
-        print('HyperDetector %s stopped..' % self.name)
-
-    
-    def stop(self):
-        '''
-        측정을 멈추는 함수
-        '''
-        self.stop_flag = True
-
-    def get_avg_value(self) -> float:
-        '''
-        측정 평균값을 리턴하는 함수
-        '''
-        return sum(self.measure_list) / self.weight
-
-    def set_detect_point(self, value:float=None):
-        '''
-        측정범위의 정 중앙지점을 설정하는 함수
-        Args
-            value: 측정범위 중앙지점 설정 (cm단위)
-        '''
-        if value == None: measure_point = self.get_avg_value()
-        else: measure_point = value
-
-        self.detect_point = measure_point
-    
-    def set_accept_range(self, range:float):
-        '''
-        측정범위 중앙지점 앞 뒤로 탐지반경을 설정하는 함수
-        Args
-            range: 측정반경 (cm)
-        '''
-        self.accept_range = range
-
-    def detect(self) -> bool:
-        '''
-        탐지결과를 리턴하는 함수
-        '''
-        self.detect_state = self.__is_in_range(self.detect_point, self.accept_range, self.get_avg_value())
-        return self.detect_state
-
+        self.measure_cursor += 1
+        if self.measure_cursor >= self.weight: self.measure_cursor = 0
+        
     def __is_in_range(self, center, range, value):
         if value >= center - range and value <= center + range: return True
         else: return False
+    
+    def get_avg_value(self, name) -> float:
+        '''
+        측정 평균값을 리턴하는 함수
+        '''
+        detector = self.detectors[name]
+        return round(sum(detector['measure_list']) / self.weight, 2)
+
+    def set_detect_point(self, name, value):
+        detector = self.detectors[name]
+
+        detector['detect_point'] = value
+
+    def set_accept_range(self, name, value):
+        detector = self.detectors[name]
+
+        detector['accpet_range'] = value
+
+    def detect(self, name):
+        detector = self.detectors[name]
+
+        return self.__is_in_range(detector['detect_point'], detector['accept_range'], self.get_avg_value(name))
+
+    
+
+    
+
+    

@@ -1,12 +1,8 @@
 #ServoDriver.py 사용을 위한 예시코드
 #스레드를 사용해서 서보모터의 개별제어 가능
 
-import RPi.GPIO as GPIO
 from ServoDriver import ServoDriver
 import time
-
-GPIO.setmode(GPIO.BCM)
-GPIO.setwarnings(False)
 
 servo1_pin = 13
 servo2_pin = 18

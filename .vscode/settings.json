@@ -1,0 +1,9 @@
+{
+    "python.analysis.extraPaths": [
+        "./modules/SocketConnection",
+        "./modules/Mp3Player",
+        "./modules/StopableThread",
+        "./modules/HyperDetector",
+        "./modules/ServoDriver"
+    ]
+}
