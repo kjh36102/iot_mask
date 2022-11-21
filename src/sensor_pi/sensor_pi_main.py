@@ -1,10 +1,21 @@
-#센서 물리는 라즈베리파이 메인코드
-
-
 #임포트 경로 설정
+import os
 import sys
-sys.path.append('../../modules/ServoDriver')
 
-#필요한 모듈들 가져오기
-from . import ServoDriver
+module_path = os.path.abspath('../../modules/')
+sys.path.append(module_path)
 
+#필요한 모듈들 import
+from SocketConnection import SocketConnection   #from [폴더명] import [모듈파일이름] <- 이런식으로 import 할 수 있음
+
+my_server = SocketConnection.SocketServer(port=20000, debug=True)   #모듈파일이름.클래스  <- 이런식으로 클래스 가져올 수 있음
+my_server.start()
+
+try:
+	while True:
+		msg = input()
+		print(msg)
+except KeyboardInterrupt:
+	pass
+
+print('end')
