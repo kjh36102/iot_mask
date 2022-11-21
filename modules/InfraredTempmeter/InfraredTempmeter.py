@@ -1,6 +1,9 @@
+import sys
+sys.path.append('./modules/StopableThread')
+
+from StopableThread import StopableThread
 import smbus
 import time
-import threading
 
 #CRC table (오류 검출용, 변경하면 안됨)
 crc8_table = [         
@@ -68,9 +71,9 @@ def calc_temp(raw_temp):
 
 #================================================================================
 
-class InfraredTempmeter(threading.Thread):
+class InfraredTempmeter(StopableThread):
     def __init__(self, i2c_addr=I2C_ADDR):
-        super().__init__(daemon=True)
+        super().__init__()
 
         self.i2c_addr = i2c_addr
         self.stop_flag = True

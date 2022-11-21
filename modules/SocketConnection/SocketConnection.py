@@ -56,10 +56,13 @@ class __SocketConnection(threading.Thread):
         '''
         for target_ip in self.connections:
             target_socket = self.connections[target_ip]
-            if target_socket == None:
-                self.my_socket.sendall(f'{chr(0)}/BRIDGE/{self.my_ip}/{target_ip}/{data}'.encode())
-            else:
-                target_socket[0].sendall(data.encode())
+            try:
+                if target_socket == None:
+                    self.my_socket.sendall(f'{chr(0)}/BRIDGE/{self.my_ip}/{target_ip}/{data}'.encode())
+                else:
+                    target_socket[0].sendall(data.encode())
+            except ConnectionAbortedError:
+                self._log(f'{target_ip} 은(는) 접속이 끊긴 클라이언트입니다.')
 
     def _receive(self, sender_ip):
         sender_socket = self.connections[sender_ip][0]
@@ -127,8 +130,23 @@ class SocketServer(__SocketConnection):
     def run(self):
         self.__create_server()
 
+        check_connection_th = threading.Thread(target=self.check_connection)
+        check_connection_th.daemon = True
+        check_connection_th.start()
+
         while not self.stop_flag:
             self.__accept_connection()
+
+    def check_connection(self):
+        while True:
+            try:
+                for target_ip in self.connections:
+                    self.connections[target_ip][0].sendall(chr(0).encode())
+            except ConnectionAbortedError:
+                self.connections.pop(target_ip)
+                self._log(f'{target_ip} 와(과) 의 연결이 끊겼습니다.')
+            
+            time.sleep(2)
 
     def __create_server(self):
         try:
@@ -190,6 +208,7 @@ class SocketClient(__SocketConnection):
         self.connect_state = False
 
     def __del__(self):
+        self.send(f'close process... {self.my_ip}', self.host)
         super().__del__()
 
     def run(self):
@@ -211,6 +230,8 @@ class SocketClient(__SocketConnection):
     def __connect_host(self):
         try:
             self.my_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self._log(f'호스트 {self.host} 의 연결을 기다리는 중입니다...')
+            
             self.my_socket.connect((self.host, self.port))
             self.connections[self.host] = (self.my_socket, self.host)
         except ConnectionRefusedError:
@@ -247,8 +268,12 @@ class SocketClient(__SocketConnection):
         try:
             target_socket = self.connections[target_ip]
         except KeyError:
-            self._log(f'전송 실패! {target_ip} 은(는) 오프라인입니다.')
-            return False
+            if target_ip == self.host:
+                raise ConnectionAbortedError
+            else:
+                self._log(f'전송 실패! {target_ip} 은(는) 오프라인입니다.')
+
+            return
 
         if target_socket == None:
             #포워딩 요청
