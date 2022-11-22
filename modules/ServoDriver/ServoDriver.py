@@ -1,3 +1,5 @@
+# sudo pigpiod 실행해야함
+
 from gpiozero import Servo
 import math
 import time
