@@ -22,18 +22,22 @@ class UltrasonicDetector:
 
         if res == '':
             log(f'포트번호 {daemon_port} 에서 pigpiod 실행됨', self)
-
-        sleep(0.5)
+            sleep(0.5)
 
         self.pin_factory = PiGPIOFactory('127.0.0.1', daemon_port)
         self.sensor = DistanceSensor(echo=echo, trigger=trig, threshold_distance=detect_range, max_distance=max_range, pin_factory=self.pin_factory)
 
-        log(f'초음파센서 {self.name} 이(가) 초기화 됨.', self)
+        log(f'초음파센서 {self.name} 이(가) 초기화 됨', self)
+    
+    def __del__(self):
+        log(f'({self.name}) 삭제됨', self)
     
     def distance(self):
+        log(f'({self.name}) 거리: {self.sensor.distance}', self)
         return self.sensor.distance
 
     def detect(self):
+        log(f'({self.name}) 측정 결과: {self.sensor.in_range}', self)
         return self.sensor.in_range
 
     def set_detect_range(self, value):

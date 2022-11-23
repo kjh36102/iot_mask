@@ -127,6 +127,15 @@ class SocketServer(__SocketConnection):
     def __del__(self):
         super().__del__()
 
+    def start(self):
+        '''
+        통신을 시작하는 함수
+        Return
+            SocketServer의 instance
+        '''
+        super().start()
+        return self
+
     def run(self):
         self.__create_server()
 
@@ -210,6 +219,15 @@ class SocketClient(__SocketConnection):
     def __del__(self):
         self.send(f'close process... {self.my_ip}', self.host)
         super().__del__()
+
+    def start(self):
+        '''
+        통신을 시작하는 함수
+        Return
+            SocketClient의 instance
+        '''
+        super().start()
+        return self
 
     def run(self):
         while not self.stop_flag:

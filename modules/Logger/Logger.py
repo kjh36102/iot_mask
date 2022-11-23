@@ -10,6 +10,6 @@ def log(msg, called_instance=None):
         debug_flag = called_instance.debug
 
     if debug_flag == True:
-        print(f'[{strftime("%H:%M:%S", localtime(time()))}][{class_name}] {msg}')
+        print(f'[{strftime("%H:%M:%S", localtime(time()))}][{class_name}] {msg}\n', end='')
 
     
