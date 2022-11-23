@@ -3,7 +3,8 @@
         "./modules/SocketConnection",
         "./modules/Mp3Player",
         "./modules/StopableThread",
-        "./modules/HyperDetector",
-        "./modules/ServoDriver"
+        "./modules/UltrasonicDetector",
+        "./modules/ServoDriver",
+        "./modules/Logger"
     ]
 }
