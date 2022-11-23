@@ -15,7 +15,7 @@ PIN_BUZZER 					= 21
 # -------
 
 # 통신 설정
-SOCKET_HOST = '192.168.0.8'
+SOCKET_HOST = '192.168.0.5'
 SOCKET_PORT = 20000
 # ---------
 
@@ -23,7 +23,7 @@ SOCKET_PORT = 20000
 import os
 import sys
 
-base_path = './modules/'
+base_path = '../../modules/'
 module_names = os.listdir(base_path)
 
 for module in module_names:
@@ -59,10 +59,10 @@ servo_sanitizer = ServoDriver(PIN_SERVO_SANITIZER)
 #----------
 
 # 모듈 전처리
-socket_client.start()
+#socket_client.start()
 
 hyper_detector.register('left', PIN_HYPER_LEFT_ECHO, PIN_HYPER_LEFT_TRIG, 20, 10)
-hyper_detector.register('right', PIN_HYPER_RIGHT_ECHO, PIN_HYPER_RIGHT_TRIG, 50, 20)
+hyper_detector.register('right', PIN_HYPER_RIGHT_ECHO, PIN_HYPER_RIGHT_TRIG, 70, 20)
 hyper_detector.start()
 #------------
 
@@ -76,18 +76,20 @@ def start_measure():
     while True:
         print(f'avg_left: {hyper_detector.get_avg_value("left")}, avg_right: {hyper_detector.get_avg_value("right")}')
             
-        left_detect = hyper_detector.detect("left")
+        #left_detect = hyper_detector.detect("left")
         right_detect = hyper_detector.detect("right")
 
-        print(f'            {left_detect}                     {right_detect}')
+        #print(f'            {left_detect}                     {right_detect}')
 
-        if left_detect == True:
-            socket_client.send('hyper left detected!', SOCKET_HOST)
+        #if left_detect == True:
+            #socket_client.send('hyper left detected!', SOCKET_HOST)
         
-        if right_detect == True:
-            socket_client.send('hyper right detected!', SOCKET_HOST)
+        #if right_detect == True:
+            #socket_client.send('hyper right detected!', SOCKET_HOST)
 
-        GPIO.output(21, left_detect)
+        #print('next:', socket_client.next())
+
+        #GPIO.output(21, left_detect)
         GPIO.output(20, right_detect)
 
         time.sleep(0.2)
@@ -107,6 +109,8 @@ try:
             print('moving..', args[1])
             servo_baricade.move(int(args[1]))
             servo_sanitizer.move(int(args[1]))
+        elif args[0] == 'send':
+            socket_client.send('person', SOCKET_HOST)
 
 except KeyboardInterrupt:
     print('end')
