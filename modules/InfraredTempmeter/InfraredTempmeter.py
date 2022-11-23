@@ -1,7 +1,10 @@
 import sys
-sys.path.append('./modules/StopableThread')
+sys.path.append('./modules/Logger')
+from Logger import log
 
-from StopableThread import StopableThread
+#-------------------------------------
+
+from threading import Thread
 import smbus
 import time
 
@@ -32,10 +35,10 @@ OBJECT_ADDR = 0x07
 
 i2c = smbus.SMBus(1)
 
-def read(reg) -> tuple:
+def read(reg, i2c_addr) -> tuple:
     buf = []
 
-    blocks = i2c.read_i2c_block_data(0x3a, reg, 3)
+    blocks = i2c.read_i2c_block_data(i2c_addr, reg, 3)
 
     #0번: low_byte, 1번: high_byte, 2번: PEC코드
     low_byte = blocks[0]
@@ -43,9 +46,9 @@ def read(reg) -> tuple:
     PEC = blocks[2]
 
     #PEC연산을 위한 데이터 저장
-    buf.append(I2C_ADDR << 1)
+    buf.append(i2c_addr << 1)
     buf.append(reg)
-    buf.append((I2C_ADDR << 1) | 0x01)
+    buf.append((i2c_addr << 1) | 0x01)
     buf.append(low_byte)
     buf.append(high_byte)
 
@@ -71,39 +74,58 @@ def calc_temp(raw_temp):
 
 #================================================================================
 
-class InfraredTempmeter(StopableThread):
-    def __init__(self, i2c_addr=I2C_ADDR):
-        super().__init__()
-
+class InfraredTempmeter(Thread):
+    def __init__(self, name='no_name', detect_temp=37.5, debug=False, i2c_addr=I2C_ADDR):
+        super().__init__(daemon=True)
+        #-----------------------------------
+        self.name = name
+        self.detect_temp = detect_temp
         self.i2c_addr = i2c_addr
-        self.stop_flag = True
+        self.stop_flag = False
+        self.debug = debug
+        #-----------------------------------
 
         self.current_sensor_temp = 0
         self.current_object_temp = 0
 
-    def run(self):
-        print('InfraredTempmeter: start measuring')
-        while True:
-            while not self.stop_flag:
-                sensor_temp = read(SENSOR_ADDR)
-                time.sleep(1)
-                object_temp = read(OBJECT_ADDR)
+        log(f'({self.name}) 초기화 완료', self)
 
-                if sensor_temp[0] == True and object_temp[0] == True:
-                    self.current_sensor_temp = calc_temp(sensor_temp[1])
-                    self.current_object_temp = calc_temp(object_temp[1])
-                    print('sensor_temp: {:.2f}, object_temp: {:.2f}'.format(self.current_sensor_temp, self.current_object_temp))
-                else:
-                    print('InfraredTempmeter: error on run()')
+    def __del__(self):
+        log(f'({self.name}) 삭제됨', self)
+
+    def run(self):
+        log(f'({self.name}) 체온 측정 시작', self)
+        while not self.stop_flag:
+            sensor_temp = read(SENSOR_ADDR, self.i2c_addr)
             time.sleep(0.5)
-    
-    def start(self):
-        if self.stop_flag == True:
-            super().start()
-            self.stop_flag = False
+            object_temp = read(OBJECT_ADDR, self.i2c_addr)
+
+            if sensor_temp[0] == True and object_temp[0] == True:
+                self.current_sensor_temp = calc_temp(sensor_temp[1])
+                self.current_object_temp = calc_temp(object_temp[1])
+                log(f'({self.name}) 센서 온도: {self.current_sensor_temp}, 물체 온도: {self.current_object_temp}', self)
+            else:
+                log(f'({self.name}) 체온 측정 중 오류 발생', self)
 
     def stop(self):
         self.stop_flag = True
     
-    def peek(self):
+    def peek(self) -> tuple:
+        '''
+        체온 데이터를 리턴하는 함수
+        Return
+            tuple(센서 온도, 물체 온도)
+        '''
+
         return (self.current_sensor_temp, self.current_object_temp)
+
+    def detect(self):
+        temp = self.peek()[1]
+        ret = False
+
+        if temp >= self.detect_temp: ret = True
+        else: ret = False
+
+        log(f'({self.name}) 감지 결과: {ret}', self)
+
+        return ret
