@@ -15,7 +15,7 @@ PIN_BUZZER 					= 21
 # -------
 
 # 통신 설정
-SOCKET_HOST = '192.168.0.5'
+SOCKET_HOST = '192.168.0.3'
 SOCKET_PORT = 20000
 PIGPIOD_PORT = 20001
 # ---------
@@ -44,6 +44,9 @@ GPIO.setwarnings(False)
 
 GPIO.setup(20, GPIO.OUT)
 GPIO.setup(21, GPIO.OUT)
+
+GPIO.output(20, False)
+GPIO.output(21, False)
 # -----------
 
 
@@ -62,7 +65,7 @@ from ServoDriver import ServoDriver
 
 
 # 모듈 객체화
-# socket_client = SocketClient(SOCKET_HOST, SOCKET_PORT).start()
+socket_client = SocketClient(SOCKET_HOST, SOCKET_PORT).start()
 voice_player = Mp3Player('./TTS_records')
 ultrasonic_left = UltrasonicDetector(
     echo=PIN_HYPER_LEFT_ECHO, trig=PIN_HYPER_LEFT_TRIG, 
@@ -72,7 +75,7 @@ ultrasonic_left = UltrasonicDetector(
 ultrasonic_right = UltrasonicDetector(
     echo=PIN_HYPER_RIGHT_ECHO, trig=PIN_HYPER_RIGHT_TRIG,
     detect_range=0.3, daemon_port=PIGPIOD_PORT,
-    name='right', debug=True
+    name='right', debug=False
 )
 servo_baricade = ServoDriver(
     pin=PIN_SERVO_BARICADE, init_angle=0,
@@ -89,7 +92,7 @@ servo_sanitizer = ServoDriver(
 
 
 # 모듈 및 소자 전처리
-#socket_client.start()
+# socket_client.start()
 
 #-------------------
 
@@ -107,25 +110,50 @@ class State(Enum):
     BARICADE_OPEN = auto()
 
 system_state = State.BARICADE_CLOSE     #초기 상태
+
+def expect_not(target_runnable, expect_return_value, callback):
+    while True:
+        if target_runnable() != expect_return_value: callback(); break
+        sleep(0.5)
+    print('종료')
 #-----------
 
 
 
 # 상태에 따른 동작 함수들
 def on_baricade_close():
+    global system_state
+
     #right 초음파센서 값 읽기
     while ultrasonic_right.detect() != True: pass
-    log('right 초음파센서 사람 감지')
+    system_state = State.WAIT_APPROCH_PERSON
+    
+    GPIO.output(20, True)   #디버그용
 
-    #사람이 계속 서있는지 감지하는 스레드 생성 및 실행
-    def expect(runnable, expect_value):
-        while True:
-            if runnable() != expect_value:
-                pass
-            sleep(0.5)
+    #사람이 없어지면 실행될 함수
+    def when_person_vanish():
+        global system_state
+        GPIO.output(20, False)
+        system_state = State.BARICADE_CLOSE
+
+        #취소되었다고 음성 재생
+        voice_player.play('process_aborted')
+
+    #스레드 실행
+    expect_th = Thread(target=expect_not, args=(ultrasonic_right.detect, True, when_person_vanish))
+    expect_th.daemon = True
+    expect_th.start()
+    print('스레드 생성됨')
     pass
 
 def on_wait_approach_person():
+    # voice_player.play('please_look_camera')   #음성재생 딜레이때문에 send가 늦게 가는 문제 해결해야함
+    log('on_wait_approach_person')
+
+    socket_client.send('PERSON_DETECTED', SOCKET_HOST)
+    while len(socket_client.receive_buffer) > 0:
+        print('받은 값: ', socket_client.next())
+    sleep(0.5)
     pass
 
 def on_wait_detect_mask():

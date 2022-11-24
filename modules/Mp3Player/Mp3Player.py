@@ -14,10 +14,13 @@ class Mp3Player():
         pygame.mixer.music.play()
         time.sleep(self.__get_mp3_len(file_name))
 
-    def play(self, file_name):
+    def play(self, file_name, join=True):
         self.th = threading.Thread(target=self.__play_action, args=(file_name, ))
         self.th.daemon = True
         self.th.start()
+        
+        if join == True:
+            self.th.join()
 
     def stop(self):
         pygame.mixer.music.stop()
