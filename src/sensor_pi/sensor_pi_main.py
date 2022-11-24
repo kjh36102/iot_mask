@@ -20,6 +20,8 @@ SOCKET_PORT = 20000
 PIGPIOD_PORT = 20001
 # ---------
 
+
+
 # 임포트 경로 설정
 import os
 import sys
@@ -32,6 +34,8 @@ for module in module_names:
     sys.path.append(base_path + module)
 #-----------------
 
+
+
 # GPIO 초기화
 import RPi._GPIO as GPIO
 
@@ -41,6 +45,8 @@ GPIO.setwarnings(False)
 GPIO.setup(20, GPIO.OUT)
 GPIO.setup(21, GPIO.OUT)
 # -----------
+
+
 
 # 필요한 모듈들 import
 from time import sleep
@@ -52,6 +58,8 @@ from Mp3Player import Mp3Player
 from UltrasonicDetector import UltrasonicDetector
 from ServoDriver import ServoDriver
 #--------------------
+
+
 
 # 모듈 객체화
 # socket_client = SocketClient(SOCKET_HOST, SOCKET_PORT).start()
@@ -78,39 +86,78 @@ servo_sanitizer = ServoDriver(
 )
 #------------
 
+
+
 # 모듈 및 소자 전처리
 #socket_client.start()
 
 #-------------------
 
 
+
+# 상태 정의
+from enum import Enum, auto
+
+class State(Enum):
+    BARICADE_CLOSE = auto()
+    WAIT_APPROCH_PERSON = auto()
+    WAIT_DETECT_MASK = auto()
+    WAIT_MEASURE_TEMP = auto()
+    WAIT_SANITIZE_HAND = auto()
+    BARICADE_OPEN = auto()
+
+system_state = State.BARICADE_CLOSE     #초기 상태
+#-----------
+
+
+
+# 상태에 따른 동작 함수들
+def on_baricade_close():
+    #right 초음파센서 값 읽기
+    while ultrasonic_right.detect() != True: pass
+    log('right 초음파센서 사람 감지')
+
+    #사람이 계속 서있는지 감지하는 스레드 생성 및 실행
+    def expect(runnable, expect_value):
+        while True:
+            if runnable() != expect_value:
+                pass
+            sleep(0.5)
+    pass
+
+def on_wait_approach_person():
+    pass
+
+def on_wait_detect_mask():
+    pass
+
+def on_wait_measure_temp():
+    pass
+
+def on_wait_sanitize_hand():
+    pass
+
+def on_baricade_open():
+    pass
+#-----------------------
+
+
+
 # 메인 ------------------------------------------------------------------------------------------------
-
-'''
-while True
-    right 초음파센서 detect()
-    
-    if 사람이 감지되었으면:
-        카메라 바라봐달라고 안내음성 재생
-        break
-
 while True:
-    소켓통신으로 촬영신호 보내기
-
-    판별 기준 횟수 정하기 = 5 정도?
-
-    while 소켓통신 next가 None이 아니면:
-        if 마스크를 썼으면: 판별 횟수 += 1
-        else 마스크를 안썼으면: 판별 횟수 -= 1
-        
-    if 판별 횟수 >= 판별 기준:
-        마스크를 착용했음
-        break
+    
+    if system_state == State.BARICADE_CLOSE:
+        on_baricade_close()
+    elif system_state == State.WAIT_APPROCH_PERSON:
+        on_wait_approach_person()
+    elif system_state == State.WAIT_DETECT_MASK:
+        on_wait_detect_mask()
+    elif system_state == State.WAIT_MEASURE_TEMP:
+        on_wait_measure_temp()
+    elif system_state == State.WAIT_SANITIZE_HAND:
+        on_wait_sanitize_hand()
+    elif system_state == State.BARICADE_OPEN:
+        on_baricade_open()
     else:
-        마스크를 쓰지 않았음
-        마스크 안내음성 재생?
-
-'''
-
-
+        log(f'알 수 없는 system_state: {system_state}')
 # -----------------------------------------------------------------------------------------------------
