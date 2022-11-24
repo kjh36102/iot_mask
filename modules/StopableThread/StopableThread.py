@@ -1,38 +1,26 @@
-import threading
+from threading import Thread
+import ctypes 
+import time
 
-class StopableThread(threading.Thread):
-    def __init__(self):
+class StopableThread(Thread): 
+    def __init__(self, target=None, args=None): 
         super().__init__(daemon=True)
 
-        self.can_run = threading.Event()
-        self.thing_done = threading.Event()
-        self.thing_done.set()
-        self.can_run.set()    
+        self.target = target
+        self.args = args
 
-    def loop(self):
-        '''
-        자식 클래스에서 오버라이딩 해서 사용, 무한반복함
-        '''
-        pass
-
+    def register(self, target, args):
+        self.target = target
+        self.args = args
+              
     def run(self):
-        while True:
-            self.can_run.wait()
-            try:
-                self.thing_done.clear()
-                self.loop()
-            finally:
-                self.thing_done.set()
-
-    def pause(self):
-        '''
-        loop()를 반복하기 전에 멈춤
-        '''
-        self.can_run.clear()
-        self.thing_done.wait()
-
-    def resume(self):
-        '''
-        loop()를 반복함
-        '''
-        self.can_run.set()
+        if self.target != None:
+            self.target(*self.args)
+   
+    def stop(self): 
+        thread_id = self.ident
+        res = ctypes.pythonapi.PyThreadState_SetAsyncExc(thread_id, 
+              ctypes.py_object(SystemExit)) 
+        if res > 1: 
+            ctypes.pythonapi.PyThreadState_SetAsyncExc(thread_id, 0) 
+            print('Failed to stop thread with id', thread_id)

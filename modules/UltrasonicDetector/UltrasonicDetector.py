@@ -10,7 +10,7 @@ from time import sleep
 from gpiozero.pins.pigpio import PiGPIOFactory
 
 class UltrasonicDetector:
-    def __init__(self, echo, trig, daemon_port, detect_range=0.3, max_range=1, name='no_name', debug=False) -> None:
+    def __init__(self, echo, trig, daemon_port, detect_range=0.3, max_range=1, queue_len=9,name='no_name', debug=False) -> None:
         #-------------------------
         self.pin_factory = None
         self.sensor = None
@@ -25,7 +25,7 @@ class UltrasonicDetector:
             sleep(0.5)
 
         self.pin_factory = PiGPIOFactory('127.0.0.1', daemon_port)
-        self.sensor = DistanceSensor(echo=echo, trigger=trig, threshold_distance=detect_range, max_distance=max_range, pin_factory=self.pin_factory)
+        self.sensor = DistanceSensor(echo=echo, trigger=trig, threshold_distance=detect_range, max_distance=max_range, queue_len=queue_len,pin_factory=self.pin_factory)
 
         log(f'초음파센서 {self.name} 이(가) 초기화 됨', self)
     
