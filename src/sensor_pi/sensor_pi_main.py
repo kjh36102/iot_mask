@@ -57,80 +57,60 @@ from ServoDriver import ServoDriver
 # socket_client = SocketClient(SOCKET_HOST, SOCKET_PORT).start()
 voice_player = Mp3Player('./TTS_records')
 ultrasonic_left = UltrasonicDetector(
-    echo=PIN_HYPER_LEFT_ECHO, 
-    trig=PIN_HYPER_LEFT_TRIG, 
-    detect_range=0.3, 
-    daemon_port=PIGPIOD_PORT,
-    name='left', 
-    debug=True
+    echo=PIN_HYPER_LEFT_ECHO, trig=PIN_HYPER_LEFT_TRIG, 
+    detect_range=0.3, daemon_port=PIGPIOD_PORT,
+    name='left', debug=True
 )
 ultrasonic_right = UltrasonicDetector(
-    echo=PIN_HYPER_RIGHT_ECHO,
-    trig=PIN_HYPER_RIGHT_TRIG,
-    detect_range=0.3,
-    daemon_port=PIGPIOD_PORT,
-    name='right',
-    debug=True
+    echo=PIN_HYPER_RIGHT_ECHO, trig=PIN_HYPER_RIGHT_TRIG,
+    detect_range=0.3, daemon_port=PIGPIOD_PORT,
+    name='right', debug=True
 )
 servo_baricade = ServoDriver(
-    pin=PIN_SERVO_BARICADE,
-    init_angle=0,
-    daemon_port=PIGPIOD_PORT,
-    name='baricade',
+    pin=PIN_SERVO_BARICADE, init_angle=0,
+    daemon_port=PIGPIOD_PORT, name='baricade',
     debug=True
 )
 servo_sanitizer = ServoDriver(
-    pin=PIN_SERVO_SANITIZER,
-    init_angle=0,
-    daemon_port=PIGPIOD_PORT,
-    name='sanitizer',
+    pin=PIN_SERVO_SANITIZER, init_angle=0,
+    daemon_port=PIGPIOD_PORT, name='sanitizer',
     debug=True
 )
-#----------
-
-# 모듈 전처리
-#socket_client.start()
-
 #------------
 
-#================================================================================================
-sleep(2)
+# 모듈 및 소자 전처리
+#socket_client.start()
 
-servo_baricade.move(90)
-servo_sanitizer.move(-90)
-
-def print_ultrasonic():
-    while True:
-        ultrasonic_left.distance()
-        left_state = ultrasonic_left.detect()
-
-        ultrasonic_right.distance()
-        right_state = ultrasonic_right.detect()
-
-        GPIO.output(21, left_state)
-        GPIO.output(20, right_state)
-
-        sleep(0.5)
+#-------------------
 
 
-print_ultrasonic_th = Thread(target=print_ultrasonic)
-print_ultrasonic_th.daemon = True
-print_ultrasonic_th.start()
+# 메인 ------------------------------------------------------------------------------------------------
+
+'''
+while True
+    right 초음파센서 detect()
+    
+    if 사람이 감지되었으면:
+        카메라 바라봐달라고 안내음성 재생
+        break
+
+while True:
+    소켓통신으로 촬영신호 보내기
+
+    판별 기준 횟수 정하기 = 5 정도?
+
+    while 소켓통신 next가 None이 아니면:
+        if 마스크를 썼으면: 판별 횟수 += 1
+        else 마스크를 안썼으면: 판별 횟수 -= 1
+        
+    if 판별 횟수 >= 판별 기준:
+        마스크를 착용했음
+        break
+    else:
+        마스크를 쓰지 않았음
+        마스크 안내음성 재생?
+
+'''
 
 
-try:
-    while True:
-        args = input().split(' ')
-        log(f'input_args: {args}')
-
-        if args[0] == 'none': pass
-        elif args[0] == 'servo_move':
-            servo_baricade.move(int(args[1]))
-            servo_sanitizer.move(int(args[1]))
-        elif args[0] == 'send':
-            # socket_client.send('person', SOCKET_HOST)
-            pass
-
-except KeyboardInterrupt:
-    print('end')
-
+# -----------------------------------------------------------------------------------------------------
