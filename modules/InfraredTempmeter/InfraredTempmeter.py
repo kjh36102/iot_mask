@@ -1,10 +1,12 @@
 import sys
 sys.path.append('./modules/Logger')
+sys.path.append('./modules/StopableThread')
+
 from Logger import log
+from StopableThread import StopableThread
 
 #-------------------------------------
 
-from threading import Thread
 import smbus
 import time
 
@@ -74,14 +76,13 @@ def calc_temp(raw_temp):
 
 #================================================================================
 
-class InfraredTempmeter(Thread):
+class InfraredTempmeter(StopableThread):
     def __init__(self, name='no_name', detect_temp=37.5, debug=False, i2c_addr=I2C_ADDR):
-        super().__init__(daemon=True)
+        super().__init__()
         #-----------------------------------
         self.name = name
         self.detect_temp = detect_temp
         self.i2c_addr = i2c_addr
-        self.stop_flag = False
         self.debug = debug
         #-----------------------------------
 
@@ -95,7 +96,7 @@ class InfraredTempmeter(Thread):
 
     def run(self):
         log(f'({self.name}) 체온 측정 시작', self)
-        while not self.stop_flag:
+        while True:
             sensor_temp = read(SENSOR_ADDR, self.i2c_addr)
             time.sleep(0.5)
             object_temp = read(OBJECT_ADDR, self.i2c_addr)
@@ -107,9 +108,6 @@ class InfraredTempmeter(Thread):
             else:
                 log(f'({self.name}) 체온 측정 중 오류 발생', self)
 
-    def stop(self):
-        self.stop_flag = True
-    
     def peek(self) -> tuple:
         '''
         체온 데이터를 리턴하는 함수

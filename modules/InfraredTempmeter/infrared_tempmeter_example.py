@@ -8,6 +8,10 @@ try:
     while True:
         values = my_tempmeter.peek()
         my_tempmeter.detect()
+        msg = input()
+
+        if msg == 'stop':
+            my_tempmeter.stop()
         time.sleep(0.5)
 
 except KeyboardInterrupt:

@@ -60,6 +60,7 @@ from Mp3Player import Mp3Player
 from UltrasonicDetector import UltrasonicDetector
 from ServoDriver import ServoDriver, map_value
 from StopableThread import StopableThread
+from InfraredTempmeter import InfraredTempmeter
 #--------------------
 
 
@@ -87,6 +88,7 @@ servo_sanitizer = ServoDriver(
     daemon_port=PIGPIOD_PORT, name='sanitizer',
     debug=True
 )
+tempmeter = InfraredTempmeter()
 #------------
 
 
@@ -119,10 +121,11 @@ def expect(target_runnable, expect_return_value, callback):
     print('종료')
 #-----------
 
-# 전역변수들
+# 전역변수
 mask_last_label = None
 mask_guided_state = False
 mask_moniter_created = False
+temp_measure_created = False
 #------------
 
 # 함수들 ------------------------------------------------------------
@@ -174,6 +177,10 @@ def detect_mask():
         elif result_avg < 39:
             return 'NO_MASK'
         else: return 'NO_PERSON'
+
+def measure_temp():
+
+    pass
 
 # ----------------------------------------------------------------
 
@@ -232,7 +239,12 @@ def on_wait_approach_person():
 
 
 def on_wait_measure_temp():
-    pass
+    global temp_measure_created
+    #체온 측정 스레드 시작
+
+    if temp_measure_created != True:
+        # temp_measure_th = StopableThread(target=)
+        pass
 
 def on_wait_sanitize_hand():
     pass
