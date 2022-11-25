@@ -100,6 +100,9 @@ class __SocketConnection(threading.Thread):
             return self.receive_buffer.pop(0)
         except IndexError:
             return None
+
+    def clear_buffer(self):
+        self.receive_buffer.clear()
     
     def connectors(self) -> list:
         '''

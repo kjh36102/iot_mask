@@ -16,6 +16,11 @@ class StopableThread(Thread):
     def run(self):
         if self.target != None:
             self.target(*self.args)
+
+    def start(self):
+        super().start()
+
+        return self
    
     def stop(self): 
         thread_id = self.ident

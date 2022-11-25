@@ -77,11 +77,13 @@ def calc_temp(raw_temp):
 #================================================================================
 
 class InfraredTempmeter(StopableThread):
-    def __init__(self, name='no_name', detect_temp=37.5, debug=False, i2c_addr=I2C_ADDR):
+    def __init__(self, name='no_name', detect_temp=37.5, adjust=0.6, ratio=0.05319, debug=False, i2c_addr=I2C_ADDR):
         super().__init__()
         #-----------------------------------
         self.name = name
         self.detect_temp = detect_temp
+        self.adjust = adjust
+        self.ratio = ratio
         self.i2c_addr = i2c_addr
         self.debug = debug
         #-----------------------------------
@@ -104,9 +106,18 @@ class InfraredTempmeter(StopableThread):
             if sensor_temp[0] == True and object_temp[0] == True:
                 self.current_sensor_temp = calc_temp(sensor_temp[1])
                 self.current_object_temp = calc_temp(object_temp[1])
+                self.current_object_temp = self.calculate_adjust()
                 log(f'({self.name}) 센서 온도: {self.current_sensor_temp}, 물체 온도: {self.current_object_temp}', self)
             else:
                 log(f'({self.name}) 체온 측정 중 오류 발생', self)
+
+    def start(self):
+        super().start()
+
+        return self
+
+    def calculate_adjust(self):
+        return self.current_object_temp + self.adjust - (self.current_sensor_temp - self.current_object_temp) * self.ratio 
 
     def peek(self) -> tuple:
         '''
