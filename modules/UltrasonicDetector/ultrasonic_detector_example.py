@@ -20,7 +20,7 @@ GPIO.setup(PIN_LED, GPIO.OUT)
 GPIO.setup(PIN_BUZZER, GPIO.OUT)
 
 sensor1 = UltrasonicDetector(echo=8, trig=7, detect_range=0.3, daemon_port=20001, name='sensor1', debug=True)
-sensor2 = UltrasonicDetector(echo=23, trig=24, detect_range=0.5, daemon_port=20001, name='sensor2', debug=True)
+sensor2 = UltrasonicDetector(echo=24, trig=23, detect_range=0.5, daemon_port=20001, name='sensor2', debug=True)
 
 def print_out():
     while True:

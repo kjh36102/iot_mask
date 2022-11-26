@@ -5,33 +5,41 @@ from ServoDriver import ServoDriver
 import time
 
 servo1_pin = 13
-servo2_pin = 18
 
-servo1 = ServoDriver(servo1_pin, init_angle=-90)
-servo2 = ServoDriver(servo2_pin, init_angle=90)
+servo1 = ServoDriver(servo1_pin, daemon_port=20001, init_angle=10)
 
-servo1.move(-70)
-servo1.move(45)
+# servo1.move(angle=90, smooth=2)
 
-for i in range(10):
-    servo1.move(-20)
-    servo1.move(20)
+smooth = 1
 
-servo2.move(-90)
-servo2.move(0)
+try:
+    while True:
+        msg = input().split(' ')
 
-for i in range(3):
-    servo2.move(-90)
-    servo2.move(90)
+        if msg[0] == 'move':
+            servo1.move(angle=float(msg[1]), smooth=smooth)
+        elif msg[0] == 'set_smooth':
+            smooth = float(msg[1])
+        elif msg[0] == 'smooth_move':
+            current = servo1.current_angle
+            angle = float(msg[1])
+            slow_point = current + (angle - current) * 0.7
+            print('current:', current, ', angle:', angle, ', slow_point:', slow_point)
+            servo1.move(angle=slow_point, smooth=1)
+            servo1.move(angle=angle, smooth=2.5)
+            # servo1.move(angle=(angle - (slow_point * -1) * 0.05), smooth=)
+        elif msg[0] == 'pump':
+            for _ in range(3):
+                servo1.move(angle=20, smooth=1)
+                servo1.move(angle=-40, smooth=3)
+                servo1.move(angle=0, smooth=0.1)
 
-time.sleep(1)
-for i in range(5):
-    servo1.move(-40)
-    servo1.move(40)
+except KeyboardInterrupt:
+    pass
 
-for i in range(10):
-    servo2.move(-20)
-    servo2.move(20)
+
+
+
 
 print('servo_test.py end..')
 

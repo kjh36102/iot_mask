@@ -5,13 +5,13 @@ Author: 	김주현
 '''
 
 # 핀 설정
-PIN_HYPER_RIGHT_ECHO 		= 8
-PIN_HYPER_RIGHT_TRIG 		= 7
-PIN_HYPER_LEFT_ECHO 		= 23
-PIN_HYPER_LEFT_TRIG 		= 24
+PIN_HYPER_RIGHT_ECHO 		= 24
+PIN_HYPER_RIGHT_TRIG 		= 23
+PIN_HYPER_LEFT_ECHO 		= 8
+PIN_HYPER_LEFT_TRIG 		= 7
 PIN_SERVO_BARICADE 			= 13
 PIN_SERVO_SANITIZER 		= 18
-PIN_BUZZER 					= 21
+PIN_PIR 					= 10
 # -------
 
 # 통신 설정
@@ -60,7 +60,7 @@ ultrasonic_right = UltrasonicDetector(
     daemon_port=PIGPIOD_PORT, name='right', debug=False
 )
 servo_baricade = ServoDriver(
-    pin=PIN_SERVO_BARICADE, init_angle=0,
+    pin=PIN_SERVO_BARICADE, init_angle=00,
     daemon_port=PIGPIOD_PORT, name='baricade',
     debug=True
 )
@@ -70,7 +70,7 @@ servo_sanitizer = ServoDriver(
     debug=True
 )
 tempmeter = InfraredTempmeter(
-    detect_temp=35
+    detect_temp=30
 ).start()
 #------------
 

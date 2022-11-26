@@ -35,7 +35,7 @@ class ServoDriver:
         self.servo = Servo(pin, min_pulse_width=0.5/1000, max_pulse_width=2.5/1000, pin_factory=self.pin_factory)
 
         if self.current_angle == None:
-            self.move(init_angle, DELAY_MAX)
+            self.move(init_angle, delay=DELAY_MAX)
         else:
             self.move(init_angle)
         
@@ -51,27 +51,47 @@ class ServoDriver:
             command = self.command_buffer.pop(0)
             angle = command[0]
             delay = command[1]
+            smooth = command[2]
 
-            self.servo.value = sin(radians(angle))
-            log(f'({self.name}) 각도 조정 {self.current_angle} -> {angle}', self)
-            
             if delay is None:   #최적 delay 자동계산, 현재 각도와 목표 각도의 차이로 계산
                 delay = map_value(abs(self.current_angle - angle), 0, 180, 0, DELAY_MAX)
 
-            sleep(delay)
+            # if smooth == 1.0:
+            #     self.servo.value = sin(radians(angle))
+            #     log(f'({self.name}) 각도 조정 {self.current_angle} -> {angle}', self)
+
+            #     sleep(delay)
+            # else:
+                # sliced_delay = delay / abs(self.current_angle - angle)
+                
+                i = self.current_angle
+                sliced_angle = (1 if self.current_angle - angle <= 0 else -1) / smooth
+                print('smooth:', smooth, 'sliced_angle:', sliced_angle)
+
+                while True:
+                    self.servo.value = sin(radians(i))
+                    print('moving:', self.servo.value)
+                    i += sliced_angle
+
+                    if (sliced_angle < 0 and i < angle) or (sliced_angle > 0 and i > angle): break
+                    sleep(0.01)
+
+                # for angle in range(self.current_angle, angle, (1 if self.current_angle - angle >= 0 else -1) / smooth):
+                #     self.servo.value = sin(radians(angle))
+                #     sleep(sliced_delay * smooth)
 
             self.current_angle = angle
         
         self.thread_lock = False
 
-    def move(self, angle, delay=None):
+    def move(self, angle, delay=None, smooth=5.0):
         '''
         서보모터의 각도를 움직이는 함수, 스레드로 동작함
         Args
             angle: 원하는 각도
             delay: 소요시간(None이면 최적의 시간 자동계산)
         '''
-        self.command_buffer.append((angle, delay))  #command_buffer에 추가
+        self.command_buffer.append((angle, delay, smooth))  #command_buffer에 추가
 
         if self.thread_lock == False:   #스레드 시작
             th1 = Thread(target=self.__set_angle)
