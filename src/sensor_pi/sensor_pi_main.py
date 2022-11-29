@@ -15,7 +15,7 @@ PIN_PIR 					= 10
 # -------
 
 # 통신 설정
-SOCKET_HOST = '192.168.0.8'
+SOCKET_HOST = '192.168.1.3'
 SOCKET_PORT = 20000
 PIGPIOD_PORT = 20001
 # ---------
@@ -53,25 +53,25 @@ ultrasonic_left = UltrasonicDetector(
     echo=PIN_HYPER_LEFT_ECHO, trig=PIN_HYPER_LEFT_TRIG, 
     detect_range=0.3, daemon_port=PIGPIOD_PORT,
     name='left', debug=True
-)
+)#.start()
 ultrasonic_right = UltrasonicDetector(
     echo=PIN_HYPER_RIGHT_ECHO, trig=PIN_HYPER_RIGHT_TRIG,
     detect_range=0.3, queue_len=20,
     daemon_port=PIGPIOD_PORT, name='right', debug=False
-)
+)#.start()
 servo_baricade = ServoDriver(
     pin=PIN_SERVO_BARICADE, init_angle=00,
     daemon_port=PIGPIOD_PORT, name='baricade',
     debug=True
-)
+)#.start()
 servo_sanitizer = ServoDriver(
     pin=PIN_SERVO_SANITIZER, init_angle=0,
     daemon_port=PIGPIOD_PORT, name='sanitizer',
     debug=True
-)
+)#.start()
 tempmeter = InfraredTempmeter(
     detect_temp=30
-).start()
+)#.start()
 #------------
 
 # 상태 정의
@@ -83,8 +83,6 @@ class State(Enum):
     WAIT_MEASURE_TEMP = auto()
     WAIT_SANITIZE_HAND = auto()
     BARICADE_OPEN = auto()
-
-system_state = State.BARICADE_CLOSE     #초기 상태
 
 def expect(target_runnable, expect_return_value, callback):
     if target_runnable() == expect_return_value: 
@@ -107,7 +105,7 @@ def detect_mask(voice=False):
         global result_avg
         global mask_last_label
 
-        socket_client.send('PERSON_DETECTED', SOCKET_HOST)
+        # socket_client.send('PERSON_DETECTED', SOCKET_HOST)
 
         #음소거 필요한경우
         if voice == False: voice_player.mute()
@@ -115,7 +113,7 @@ def detect_mask(voice=False):
         # 버퍼에 받은 패킷이 있으면 연속적으로 실행
         while len(socket_client.receive_buffer) > 0:
             packet = socket_client.next()
-            # print('packet:', packet)
+            print('packet:', packet)
             raw_str_list = packet[2].split(':')
 
             label = raw_str_list[0]
@@ -125,6 +123,7 @@ def detect_mask(voice=False):
             if label != mask_last_label:
                 voice_player.play('waiting_mask_recognize', join=False)
                 mask_last_label = label
+                socket_client.receive_buffer.clear()    #테스트 추가됨
 
             # 값 맵핑
             if label == 'NO_PERSON':
@@ -134,11 +133,13 @@ def detect_mask(voice=False):
             elif label == 'MASK':
                 result_buffer.append(map_value(probability, 0, 100, MASK_BORDER, 100))
 
+            print('prob:', probability)
+
             # 평균 구하기
             if len(result_buffer) >= BUFFER_MAX: 
                 result_avg = sum(result_buffer) / BUFFER_MAX
                 result_buffer.clear()
-                # print('result_avg:', result_avg)
+                print('\tresult_avg:', result_avg)
                 break 
 
         #음소거 해제
@@ -203,7 +204,7 @@ def on_wait_approach_person():
             break
         elif res == 'MASK':
             print('mask on')
-            system_state = State.WAIT_MEASURE_TEMP
+            # system_state = State.WAIT_MEASURE_TEMP
             break
         elif res == 'NO_MASK':
             print('no mask')
@@ -268,10 +269,14 @@ def on_baricade_open():
 
 
 
+
+system_state = State.WAIT_APPROCH_PERSON     #초기 상태
+
 # 메인 ------------------------------------------------------------------------------------------------
 while True:
     if system_state == State.BARICADE_CLOSE:
-        on_baricade_close()
+        # on_baricade_close()
+        pass
     elif system_state == State.WAIT_APPROCH_PERSON:
         on_wait_approach_person()
     elif system_state == State.WAIT_MEASURE_TEMP:

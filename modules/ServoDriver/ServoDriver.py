@@ -19,25 +19,31 @@ class ServoDriver:
         self.pin_factory = None
         self.servo = None
         self.name = name
+        self.daemon_port = daemon_port
+        self.pin = pin
+        self.init_angle = init_angle
         self.current_angle = None
         self.command_buffer = []
         self.thread_lock = False
         self.debug = debug
         #-----------------------------------------
 
-        res = run(['sudo', 'pigpiod', '-p', str(daemon_port)], capture_output=True).stderr.decode()
+        
+
+    def start(self):
+        res = run(['sudo', 'pigpiod', '-p', str(self.daemon_port)], capture_output=True).stderr.decode()
 
         if res == '':
-            log(f'포트번호 {daemon_port} 에서 pigpiod 실행됨', self)
+            log(f'포트번호 {self.daemon_port} 에서 pigpiod 실행됨', self)
             sleep(0.5)
 
-        self.pin_factory = PiGPIOFactory('127.0.0.1', daemon_port)
-        self.servo = Servo(pin, min_pulse_width=0.5/1000, max_pulse_width=2.5/1000, pin_factory=self.pin_factory)
+        self.pin_factory = PiGPIOFactory('127.0.0.1', self.daemon_port)
+        self.servo = Servo(self.pin, min_pulse_width=0.5/1000, max_pulse_width=2.5/1000, pin_factory=self.pin_factory)
 
         if self.current_angle == None:
-            self.move(init_angle, delay=DELAY_MAX)
+            self.move(self.init_angle, delay=DELAY_MAX)
         else:
-            self.move(init_angle)
+            self.move(self.init_angle)
         
         log(f'서보모터 {self.name} 이(가) 초기화 됨', self)
     

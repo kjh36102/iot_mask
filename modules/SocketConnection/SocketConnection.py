@@ -253,8 +253,12 @@ class SocketClient(__SocketConnection):
             self.my_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self._log(f'호스트 {self.host} 의 연결을 기다리는 중입니다...')
             
+            print('host:', self.host, ', port:', self.port)
+
             self.my_socket.connect((self.host, self.port))
+            print('before connections:', self.connections)
             self.connections[self.host] = (self.my_socket, self.host)
+            print('start connections:', self.connections)
         except ConnectionRefusedError:
             self._log(f'호스트 {self.host} 으(로)부터 연결이 거부되었습니다. 서버가 열려있는지 또는 동일 네트워크에 연결되어있는지 확인하십시오.')
             return
@@ -289,10 +293,10 @@ class SocketClient(__SocketConnection):
         try:
             target_socket = self.connections[target_ip]
         except KeyError:
-            if target_ip == self.host:
-                raise ConnectionAbortedError
-            else:
-                self._log(f'전송 실패! {target_ip} 은(는) 오프라인입니다.')
+            # if target_ip == self.host:
+            #     raise ConnectionAbortedError
+            # else:
+            self._log(f'전송 실패! {target_ip} 은(는) 오프라인입니다.')
 
             return
 

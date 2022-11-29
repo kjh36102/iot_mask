@@ -27,12 +27,9 @@ try:
             print('current:', current, ', angle:', angle, ', slow_point:', slow_point)
             servo1.move(angle=slow_point, smooth=1)
             servo1.move(angle=angle, smooth=2.5)
-            # servo1.move(angle=(angle - (slow_point * -1) * 0.05), smooth=)
         elif msg[0] == 'pump':
-            for _ in range(3):
-                servo1.move(angle=20, smooth=1)
-                servo1.move(angle=-40, smooth=3)
-                servo1.move(angle=0, smooth=0.1)
+                servo1.move(angle=-30, smooth=smooth)
+                servo1.move(angle=0, smooth=smooth)
 
 except KeyboardInterrupt:
     pass
