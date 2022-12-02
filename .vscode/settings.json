@@ -1,11 +1,13 @@
 {
     "python.analysis.extraPaths": [
-        "./modules/SocketConnection",
         "./modules/Mp3Player",
         "./modules/StopableThread",
         "./modules/UltrasonicDetector",
         "./modules/ServoDriver",
         "./modules/Logger",
-        "./modules/InfraredTempmeter"
+        "./modules/InfraredTempmeter",
+        "./modules/PIR",
+        "./modules/LCD",
+        "./modules/SocketConnection"
     ]
 }

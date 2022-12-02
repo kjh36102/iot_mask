@@ -1,0 +1,20 @@
+greeting: 안녕하세요.
+process_aborted: 취소되었습니다.
+
+mask_detect_start: 마스크를 인식중입니다.
+mask_detected: 마스크가 인식되었습니다.
+mask_not_detected: 마스크를 착용 해주세요.
+mask_no_person: 카메라에 얼굴이 나오도록 바라봐주세요.
+
+guide_tempmeter: 체온측정기를 이마에 가져다 대세요.
+tempmeter_measure_start: 체온을 측정합니다. 움직이지 마세요.
+tempmeter_normal: 정상 체온입니다.
+tempmeter_high_retry: 체온이 높습니다. 다시 측정해주세요.
+tempmeter_high_banned: 체온이 높아 입장하실 수 없습니다.
+
+guide_sanitizer: 기기 오른쪽 면에서 손소독제를 받으세요.
+
+barricade_open: 바리케이드가 열립니다.
+barricade_close: 바리케이드가 닫힙니다.
+
+

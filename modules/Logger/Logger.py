@@ -1,6 +1,6 @@
 from time import strftime, localtime, time
 
-def log(msg, called_instance=None):
+def log(called_instance, *msg):
     debug_flag = True
     
     if called_instance == None:
@@ -10,6 +10,4 @@ def log(msg, called_instance=None):
         debug_flag = called_instance.debug
 
     if debug_flag == True:
-        print(f'[{strftime("%H:%M:%S", localtime(time()))}][{class_name}] {msg}\n', end='')
-
-    
+        print(f'[{strftime("%H:%M:%S", localtime(time()))}][{class_name}] {str.join(" ", map(str, msg))}\n', end='')

@@ -4,12 +4,9 @@
 from ServoDriver import ServoDriver
 import time
 
-servo1_pin = 13
+servo1_pin = 18
 
-servo1 = ServoDriver(servo1_pin, daemon_port=20001, init_angle=10)
-
-# servo1.move(angle=90, smooth=2)
-
+servo1 = ServoDriver(servo1_pin, init_angle=90, daemon_port=20001).start()
 smooth = 1
 
 try:
@@ -25,11 +22,11 @@ try:
             angle = float(msg[1])
             slow_point = current + (angle - current) * 0.7
             print('current:', current, ', angle:', angle, ', slow_point:', slow_point)
-            servo1.move(angle=slow_point, smooth=1)
-            servo1.move(angle=angle, smooth=2.5)
+            servo1.move(angle=slow_point, smooth=smooth)
+            servo1.move(angle=angle, smooth=2.5 * smooth)
         elif msg[0] == 'pump':
-                servo1.move(angle=-30, smooth=smooth)
-                servo1.move(angle=0, smooth=smooth)
+                servo1.move(angle=10, smooth=3)
+                servo1.move(angle=-15, smooth=0.5)
 
 except KeyboardInterrupt:
     pass

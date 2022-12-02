@@ -1,5 +1,12 @@
+import sys
+sys.path.append('./modules/Logger')
+sys.path.append('./modules/StopableThread')
+from Logger import log
+from StopableThread import StopableThread
+
+#----------------------
+
 import socket
-import threading
 import time
 
 def local_ip() -> str:
@@ -10,265 +17,232 @@ def local_ip() -> str:
     s.connect(('8.8.8.8', 0))
     return s.getsockname()[0]
 
-class __SocketConnection(threading.Thread):
-    def __init__(self, host, port, debug):
-        super().__init__(daemon=True)
+class __SocketConnection(StopableThread):
+    def __init__(self, port, host=local_ip(), buffer_len=30, debug=False):
+        super().__init__()
 
         self.host = host
         self.port = port
-        self.debug = debug
-
         self.my_ip = local_ip()
         self.my_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.connections = {}
-        self.receive_buffer = []
-        self.stop_flag = False
-    
+        self.connections = {} 
+        self.receive_buffer = {}
+        self.buffer_len = buffer_len
+        self.waiting_next_part = ''
+
+        self.debug = debug
+
     def __del__(self):
-        self.stop()
         self.my_socket.close()
 
-    def start(self):
-        self.stop_flag = False
-        super().start()
-
-    def stop(self):
-        self.stop_flag = True
-    
-    def send(self, data:str, target_ip:str) -> bool:
-        '''
-        목표에게 데이터를 전송하는 함수
-        Args
-            data: 전송할 데이터
-            target_ip: 목표의 IP주소
-        '''
-        try:
-            self.connections[target_ip][0].sendall(data.encode())
-            return True
-        except KeyError:
-            self._log(f'전송 실패! {target_ip} 은(는) 오프라인 입니다.')
-
-        return False
-    
-    def broadcast(self, data):
-        '''
-        연결된 모든 장치에게 데이터를 전송하는 함수
-        '''
         for target_ip in self.connections:
             target_socket = self.connections[target_ip]
-            try:
-                if target_socket == None:
-                    self.my_socket.sendall(f'{chr(0)}/BRIDGE/{self.my_ip}/{target_ip}/{data}'.encode())
-                else:
-                    target_socket[0].sendall(data.encode())
-            except ConnectionAbortedError:
-                self._log(f'{target_ip} 은(는) 접속이 끊긴 클라이언트입니다.')
 
-    def _receive(self, sender_ip):
-        sender_socket = self.connections[sender_ip][0]
+            if target_socket != None: target_socket.close()
+
+    def send(self, data, target_ip):
+        while True:
+            try:
+                data = data + chr(0)  #데이터 끝 식별자를 붙여 전송
+                self.connections[target_ip].sendall(data.encode())
+                break
+            except (ConnectionAbortedError, ConnectionResetError, BrokenPipeError):
+                log(self, f'전송 실패! 호스트 {target_ip} 와 연결할 수 없습니다.')
+
+                #receive_buffer 정리
+                self.receive_buffer[target_ip].clear()
+            except KeyError:
+                log(self, f'전송 실패! {target_ip} 은(는) 오프라인입니다.')
+
+            time.sleep(5)
+            return
+            
+
+    def broadcast(self, data):
+        data = data + chr(0)
+
+        for target_ip in self.connections:
+            try:
+                target_socket = self.connections[target_ip]
+                if target_socket == None:
+                    #호스트에게 브릿지 부탁
+                    self.my_socket.sendall(f'{chr(1)}/REQ_BRIDGE/{self.my_ip}/{target_ip}/{data}'.encode())
+                else:
+                    #직접 전송
+                    target_socket.sendall(data.encode())
+            except (ConnectionAbortedError, ConnectionResetError, BrokenPipeError):
+                log(self, f'전송 실패! {target_ip} 은(는) 오프라인입니다.')
+
+            #receive_buffer 정리
+            self.receive_buffer[target_ip].clear()
+        
+    def next(self, target_ip):
+        try:
+            return self.receive_buffer[target_ip].pop(0)
+        except (IndexError, KeyError):
+            return None
+        
+    
+    def _data_preprocess(self, data, sender_ip):
+        self.waiting_next_part = ''
+
+        data_splited = data.split(chr(0))
+
+        for i in range(len(data_splited) - 1):
+            if chr(1) in data_splited[i]:   #커맨드 식별자가 포함되어있으면
+                self._receive_action(data_splited[i])
+            elif data_splited[i] != '':
+                # if len(self.receive_buffer[sender_ip]) < self.buffer_len:
+                    self.receive_buffer[sender_ip].append((sender_ip, self.my_ip, data_splited[i]))
+                # else:
+                #     log(self, f'{sender_ip} 을(를) 위한 수신버퍼가 꽉 찼습니다. 버린 데이터: {data_splited[i]}')
+
+        self.waiting_next_part = data_splited[-1]
+
+    def _receive(self, sender_ip=None):
+        if sender_ip == None: sender_ip = self.host #클라이언트는 호스트에게서만 메시지를 받음
+        
+        sender_socket = self.connections[sender_ip]
 
         try:
             while True:
-                data = sender_socket.recv(128)
-                if not data: break
+                data = self.waiting_next_part + sender_socket.recv(32).decode()
+                self._data_preprocess(data, sender_ip)
+        except (ConnectionAbortedError, ConnectionResetError):
+            log(self, f'{sender_ip} 이(가) 강제로 연결을 끊었습니다.')
 
-                decoded = data.decode()
+            #receive_buffer 정리
+            self.receive_buffer[sender_ip].clear()
 
-                if decoded[0] != chr(0):
-                    self.receive_buffer.append((sender_ip, self.my_ip, decoded))
-                    self._log(f'[{sender_ip} -> {self.my_ip}]: {decoded}')
-                elif len(decoded) > 1:
-                    self._receive_action(decoded)
-
-        except ConnectionResetError:
-            self.connections.pop(sender_ip)
-            self.broadcast(f'{chr(0)}/LEFT/{sender_ip}')    #퇴장 알리기
-
-            self._log(f'{sender_ip} 에서 연결을 끊었습니다.')
-            self._log(f'접속자 수: {len(self.connections)}')
-    
     def _receive_action(self, decoded):
+        #자식클래스가 상속받아 작성
         pass
 
-    def next(self) -> tuple:
-        '''
-        수신 버퍼에서 다음 패킷을 가져오는 함수
-        Return
-            tuple(보낸 IP, 받는 IP, 데이터)
-        '''
-        try:
-            return self.receive_buffer.pop(0)
-        except IndexError:
-            return None
-
-    def clear_buffer(self):
-        self.receive_buffer.clear()
-    
-    def connectors(self) -> list:
-        '''
-        연결된 장치들의 IP주소 리스트를 반환하는 함수
-        Return
-            IP주소 리스트
-        '''
-        return list(self.connections.keys())
-
-    def _log(self, message):
-        if self.debug == True:
-            print(f'[{time.strftime("%H:%M:%S", time.localtime(time.time()))}]  {message}')
 
 class SocketServer(__SocketConnection):
-    def __init__(self, port:int, debug:bool=False):
-        '''
-        SocketServer의 생성자
-        Args
-            port: 포트번호
-            debug: 디버그 여부
-        '''
-        super().__init__(host=None, port=port, debug=debug)
-        self.host = local_ip()
+    def __init__(self, port, host=local_ip(), debug=False):
+        super().__init__(port, host, debug)
+
+        self.receive_threads = {}
 
     def __del__(self):
+        for target_ip in self.receive_threads:
+            self.receive_threads[target_ip].stop()
         super().__del__()
-
-    def start(self):
-        '''
-        통신을 시작하는 함수
-        Return
-            SocketServer의 instance
-        '''
-        super().start()
-        return self
 
     def run(self):
         self.__create_server()
 
-        check_connection_th = threading.Thread(target=self.check_connection)
-        check_connection_th.daemon = True
-        check_connection_th.start()
+        StopableThread(target=self.check_connection, args=()).start()
 
-        while not self.stop_flag:
-            self.__accept_connection()
-
-    def check_connection(self):
-        while True:
-            try:
-                for target_ip in self.connections:
-                    self.connections[target_ip][0].sendall(chr(0).encode())
-            except ConnectionAbortedError:
-                self.connections.pop(target_ip)
-                self._log(f'{target_ip} 와(과) 의 연결이 끊겼습니다.')
-            
-            time.sleep(2)
+        while True: self.__accept_connection()
 
     def __create_server(self):
         try:
             self.my_socket.bind((self.host, self.port))
+            self.my_socket.listen(1)
+            log(self, f'서버가 {self.my_ip} 에서 실행되었습니다.')
         except Exception as e:
-            self._log(f'서버 생성 실패! {e}')
-            return
-
-        self.my_socket.listen(1)
-        self._log(f'서버가 {self.my_ip} 에서 실행되었습니다.')
-
+            log(self, f'서버 생성 JOIN실패! {e}')
+    
     def __accept_connection(self):
         connection = self.my_socket.accept()
         sender_socket = connection[0]
         sender_ip = connection[1][0]
-        
-        self._log(f'서버가 {sender_ip} 의 연결을 허용했습니다.')
+
+        log(self, f'서버가 {sender_ip} 의 연결을 허용했습니다.')
 
         #접속자에게 목록 넘겨주기
         if len(self.connections) > 0:
-            cmd = f'{chr(0)}/LIST/{"/".join(list(self.connections.keys()))}'
+            cmd = f'{chr(1)}/LIST/{str.join("/", list(self.connections.keys()))}{chr(0)}'
             sender_socket.sendall(cmd.encode())
 
-        self.broadcast(f'{chr(0)}/JOIN/{sender_ip}')    #모두에게 입장 알리기
+        #모두에게 입장 알리기
+        self.broadcast(f'{chr(1)}/JOIN/{sender_ip}')
+        
+        #연결목록에 추가
+        self.connections[sender_ip] = sender_socket
+        log(self, f'접속자 수: {len(self.connections)}')
 
-        self.connections[sender_ip] = (sender_socket, sender_ip)
+        #수신 버퍼 생성
+        self.receive_buffer[sender_ip] = []
 
-        self._log(f'접속자 수: {len(self.connections)}')
-
-        receive_th = threading.Thread(target=self._receive, args=(sender_ip, ))
-        receive_th.daemon = True
-        receive_th.start()
-
+        #수신 스레드 생성
+        receive_th = StopableThread(target=self._receive, args=(sender_ip, )).start() 
+        self.receive_threads[sender_ip] = receive_th
+    
+    def check_connection(self):
+        while True:
+            try:
+                for target_ip in self.connections:
+                    self.connections[target_ip].sendall(chr(0).encode())
+            except (ConnectionAbortedError, ConnectionResetError, BrokenPipeError):
+                self.connections.pop(target_ip)
+                self.receive_threads.pop(target_ip).stop()
+                self.receive_buffer.pop(target_ip)
+                self.broadcast(f'{chr(1)}/LEFT/{target_ip}')
+                log(self, f'{target_ip} 와(과) 의 연결이 끊겼습니다.')
+            
+            time.sleep(2)
+    
     def _receive_action(self, decoded):
         args = decoded.split(sep='/')
 
-        if args[1] == 'BRIDGE':
+        if args[1] == 'REQ_BRIDGE':
             sender_ip = args[2]
             target_ip = args[3]
             data = args[4]
-            self.send(f'{chr(0)}/BRIDGED/{sender_ip}/{data}', target_ip)
-            self._log(f'[{sender_ip} -> {target_ip}]: {data}')
+            self.send(f'{chr(1)}/BRIDGED/{sender_ip}/{data}', target_ip)
+            log(self, f'[{sender_ip} -> {target_ip}]: {data}')
+
+
 
 class SocketClient(__SocketConnection):
-    def __init__(self, host, port, reconn_time=3, debug=False):
-        '''
-        SocketClient의 생성자
-        Args
-            host: 호스트 주소
-            port: 포트 번호
-            reconn_time: 재연결 사이클 단위시간
-            debug: 디버그 여부
-        Description
-            재연결 사이클 생성시간은 호스트와 연결이 끊길 때 재연결을 시도하는 시간 간격
-        '''
-        super().__init__(host, port, debug)
+    def __init__(self, port, host=local_ip(), reconn_time=5, debug=False):
+        super().__init__(port, host, debug)
 
         self.reconn_time = reconn_time
         self.connect_state = False
+        self.receive_th = None
 
     def __del__(self):
-        self.send(f'close process... {self.my_ip}', self.host)
+        if self.receive_th != None: self.receive_th.stop()
         super().__del__()
 
-    def start(self):
-        '''
-        통신을 시작하는 함수
-        Return
-            SocketClient의 instance
-        '''
-        super().start()
-        return self
-
     def run(self):
-        while not self.stop_flag:
+        while True:
             while not self.connect_state:
                 self.__connect_host()
             
-            time.sleep(self.reconn_time) #연결 끊겼는지 reconnect_time마다 확인
+            time.sleep(self.reconn_time)
+
             try:
-                self.send(chr(0), self.host) #chr(0)은 ping에 사용되는 코드
+                self.send('', self.host)
             except ConnectionAbortedError:
-                self._log(f'호스트 {self.host} 와(과)의 연결이 끊겼습니다.')
+                log(self, f'호스트 {self.host} 와(과)의 연결이 끊겼습니다.')
                 self.connect_state = False
+                self.receive_buffer.pop(self.host)
                 self.my_socket.close()
 
-                #접속자목록 초기화
+                #접속자 목록 초기화
                 self.connections.clear()
-    
+            
     def __connect_host(self):
         try:
             self.my_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self._log(f'호스트 {self.host} 의 연결을 기다리는 중입니다...')
-            
-            print('host:', self.host, ', port:', self.port)
+            log(self, f'호스트 {self.host} 의 연결을 기다리는 중입니다...')
 
             self.my_socket.connect((self.host, self.port))
-            print('before connections:', self.connections)
-            self.connections[self.host] = (self.my_socket, self.host)
-            print('start connections:', self.connections)
-        except ConnectionRefusedError:
-            self._log(f'호스트 {self.host} 으(로)부터 연결이 거부되었습니다. 서버가 열려있는지 또는 동일 네트워크에 연결되어있는지 확인하십시오.')
-            return
-            
-        self._log(f'호스트 {self.host} 에 연결되었습니다.')
-        self.connect_state = True
+            self.connections[self.host] = self.my_socket
 
-        receive_th = threading.Thread(target=self._receive, args=(self.host,))
-        receive_th.daemon = True
-        receive_th.start()
+            log(self, f'호스트 {self.host} 에 연결되었습니다.')
+            self.connect_state = True
+
+            self.receive_buffer[self.host] = []
+
+            self.receive_th = StopableThread(target=self._receive, args=(self.host, )).start()
+        except ConnectionRefusedError:
+            log(self, f'호스트 {self.host} 으(로)부터 연결이 거부되었습니다. 서버가 열려있는지 또는 동일 네트워크에 연결되어있는지 확인하십시오.')
 
     def _receive_action(self, decoded):
         args = decoded.split(sep='/')
@@ -276,34 +250,15 @@ class SocketClient(__SocketConnection):
         if args[1] == 'BRIDGED':
             sender_ip = args[2]
             data = args[3]
-            self._log(f'[{sender_ip}]: {data}')
-            self.receive_buffer.append((sender_ip, self.my_ip, data))
+            log(self, f'[{sender_ip}]: {data}')
+            self._data_preprocess(data, sender_ip)
         elif args[1] == 'JOIN':
             self.connections[args[2]] = None
-            self._log(f'{args[2]} 이(가) 통신에 참가했습니다.')
+            log(self, f'{args[2]} 이(가) 통신에 참가했습니다.')
         elif args[1] == 'LEFT':
             self.connections.pop(args[2])
-            self._log(f'{args[2]} 이(가) 통신을 종료했습니다.')
+            log(self, f'{args[2]} 이(가) 통신을 종료했습니다.')
         elif args[1] == 'LIST':
             join_list = args[2:]
             for who in join_list:
                 self.connections[who] = None
-
-    def send(self, data, target_ip):
-        try:
-            target_socket = self.connections[target_ip]
-        except KeyError:
-            # if target_ip == self.host:
-            #     raise ConnectionAbortedError
-            # else:
-            self._log(f'전송 실패! {target_ip} 은(는) 오프라인입니다.')
-
-            return
-
-        if target_socket == None:
-            #포워딩 요청
-            self.my_socket.sendall(f'{chr(0)}/BRIDGE/{self.my_ip}/{target_ip}/{data}'.encode())
-        else:
-            super().send(data, target_ip)
-        
-        return True

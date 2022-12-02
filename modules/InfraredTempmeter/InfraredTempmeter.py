@@ -91,13 +91,13 @@ class InfraredTempmeter(StopableThread):
         self.current_sensor_temp = 0
         self.current_object_temp = 0
 
-        log(f'({self.name}) 초기화 완료', self)
+        log(self, f'({self.name}) 초기화 완료')
 
     def __del__(self):
-        log(f'({self.name}) 삭제됨', self)
+        log(self, f'({self.name}) 삭제됨')
 
     def run(self):
-        log(f'({self.name}) 체온 측정 시작', self)
+        log(self, f'({self.name}) 체온 측정 시작')
         while True:
             sensor_temp = read(SENSOR_ADDR, self.i2c_addr)
             time.sleep(0.5)
@@ -107,9 +107,9 @@ class InfraredTempmeter(StopableThread):
                 self.current_sensor_temp = calc_temp(sensor_temp[1])
                 self.current_object_temp = calc_temp(object_temp[1])
                 self.current_object_temp = self.calculate_adjust()
-                log(f'({self.name}) 센서 온도: {self.current_sensor_temp}, 물체 온도: {self.current_object_temp}', self)
+                log(self, f'({self.name}) 센서 온도: {self.current_sensor_temp}, 물체 온도: {self.current_object_temp}')
             else:
-                log(f'({self.name}) 체온 측정 중 오류 발생', self)
+                log(self, f'({self.name}) 체온 측정 중 오류 발생')
 
     def start(self):
         super().start()
@@ -135,6 +135,6 @@ class InfraredTempmeter(StopableThread):
         if temp >= self.detect_temp: ret = True
         else: ret = False
 
-        log(f'({self.name}) 감지 결과: {ret}', self)
+        log(self, f'({self.name}) 감지 결과: {ret}')
 
         return ret
