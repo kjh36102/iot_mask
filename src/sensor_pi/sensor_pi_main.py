@@ -52,12 +52,12 @@ socket_client = SocketClient(host=SOCKET_HOST, port=SOCKET_PORT, debug=True).sta
 voice_player = Mp3Player('./TTS_records')
 ultrasonic_left = UltrasonicDetector(
     echo=PIN_HYPER_LEFT_ECHO, trig=PIN_HYPER_LEFT_TRIG, 
-    detect_range=0.4, max_range=0.5, queue_len=1, daemon_port=PIGPIOD_PORT,
+    detect_range=0.5, max_range=0.6, queue_len=1, daemon_port=PIGPIOD_PORT,
     name='left', debug=False
 ).start()
 ultrasonic_right = UltrasonicDetector(
     echo=PIN_HYPER_RIGHT_ECHO, trig=PIN_HYPER_RIGHT_TRIG,
-    detect_range=0.4, max_range=0.5, queue_len=40,
+    detect_range=0.6, max_range=1, queue_len=30,
     daemon_port=PIGPIOD_PORT, name='right', debug=False
 ).start()
 servo_baricade = ServoDriver(
@@ -85,8 +85,6 @@ class State(Enum):
     WAIT_SANITIZE_HAND = auto()
     WAIT_PERSON_PASS = auto()
     BARICADE_OPEN = auto()
-
-
 #-----------
 
 # 기능 함수들 ----------------------------------------------------
@@ -97,9 +95,18 @@ def expect(target_runnable, expect_return_value, callback):
 
     return False
 
+mask_checked = False
+temperature_checked = False
+sanitizer_checked = False
+
+def clear_user_checks():
+    global mask_checked; mask_checked = False
+    global temperature_checked; temperature_checked = False
+    global sanitizer_checked; sanitizer_checked = False
+
 NO_MASK_BORDER = 39
 MASK_BORDER = 60
-BUFFER_MAX = 25
+BUFFER_MAX = 10
 mask_result_buffer = []
 mask_result_avg = None
 mask_last_label = None
@@ -115,9 +122,10 @@ def detect_mask(voice=False):
         if voice == False: voice_player.mute()
 
         # 버퍼에 받은 패킷이 있으면 연속적으로 실행
-        while len(socket_client.receive_buffer) > 0:
-            packet = socket_client.next()
+        while len(socket_client.receive_buffer[SOCKET_HOST]) > 0:
+            packet = socket_client.next(SOCKET_HOST)
             print('packet:', packet)
+
             raw_str_list = packet[2].split(':')
 
             label = raw_str_list[0]
@@ -125,9 +133,10 @@ def detect_mask(voice=False):
 
             # 사용자의 상태가 변화하면 인식중 음성 재생
             if label != mask_last_label:
-                voice_player.play('waiting_mask_recognize', join=False)
+                voice_player.play('mask_detect_start', join=False)
                 mask_last_label = label
-                socket_client.receive_buffer.clear()    #테스트 추가됨
+                mask_result_buffer.clear()
+                # socket_client.receive_buffer[SOCKET_HOST].clear()    #테스트 추가됨
 
             # 값 맵핑
             if label == 'NO_PERSON':
@@ -176,9 +185,6 @@ def when_person_vanish():
     global mask_result_buffer
     mask_result_buffer.clear()
 
-    # global mask_last_label
-    # mask_last_label = None
-
     global system_state
     system_state = State.BARICADE_CLOSE
     voice_player.play('process_aborted')
@@ -188,64 +194,85 @@ def when_person_vanish():
     lcd.lcd_display_string('                    ', 3)
     lcd.lcd_display_string('--------------------', 4)
 
-    socket_client.send('PERSON_VANISHED', SOCKET_HOST)
-
 #사용자가 마스크를 벗을 때 호출할 콜백 함수
 def when_mask_off():
     global system_state
+    global mask_checked
 
     system_state = State.WAIT_APPROCH_PERSON
-    voice_player.play('no_mask')
+    mask_checked = False
+
+    #문 닫기
+    servo_baricade.move(0, smooth=0.5)
+
+    voice_player.play('mask_not_detected')
 
 # ---------------------------------------------------------------
 
 # 상태에 따른 동작 함수들 -----------------------------------------
 def on_baricade_close():
+    clear_user_checks()
+
+    ultrasonic_right.queue_len = 30
 
     #초음파센서 사람 없으면 패스
     while ultrasonic_right.detect() == False: pass
 
     #greeting 음성 출력
-    # voice_player.play('greeting')
+    voice_player.play('greeting')
 
     #다음 상태로 전환
     global system_state
     system_state = State.WAIT_APPROCH_PERSON
 
 def on_wait_approach_person():
+    global system_state
+    global mask_checked
+
+    if mask_checked == True:    #이미 했으면 스킵
+        system_state = State.WAIT_MEASURE_TEMP
+        return
+
+    #오른쪽 초음파 둔감하게하기
+    ultrasonic_right.queue_len = 100
 
     #소켓 버퍼 비우기(이전 측정 결과가 남아있기 때문)
-    socket_client.receive_buffer.clear()
+    socket_client.receive_buffer[SOCKET_HOST].clear()
 
     while True:
         # 사용자가 사라지는지 모니터링
         if expect(ultrasonic_right.detect, False, when_person_vanish): break
 
         res = detect_mask(voice=True)
-        sleep(0.2)
-
+        sleep(0.2)  #메세지 전송 딜레이
+        
         if res == 'NO_PERSON':
             print('there is no person')
-            voice_player.play('please_look_camera', join=False)
-            break
+            voice_player.play('mask_no_person')
         elif res == 'MASK':
             print('mask on')
-            global system_state
+            voice_player.play('mask_detected')
             system_state = State.WAIT_MEASURE_TEMP
-            break
+            mask_checked = True
         elif res == 'NO_MASK':
             print('no mask')
-            voice_player.play('no_mask', join=False)
-            break
+            voice_player.play('mask_not_detected')
+
+        if res != 'None': break
         
 
 def on_wait_measure_temp():
     global system_state
+    global temperature_checked
 
-    voice_player.play('temp_measure_guide')
+    if temperature_checked == True:     #스킵
+        system_state = State.WAIT_SANITIZE_HAND
+        return
+
+    voice_player.play('guide_tempmeter')
 
     temp_buffer = []
-    TEMP_BUFFER_MAX = 15
+    TEMP_BUFFER_MAX = 20
     guide_state = False
     try_cnt = 0
 
@@ -263,7 +290,7 @@ def on_wait_measure_temp():
         if temp <= 30: continue
 
         if guide_state == False:
-            voice_player.play('waiting_temp_measuring', join=False)
+            voice_player.play('tempmeter_measure_start', join=False)
             guide_state = True
 
         temp_buffer.append(temp)
@@ -273,24 +300,31 @@ def on_wait_measure_temp():
 
             if avg > tempmeter.detect_temp: #열이 나는경우
                 if try_cnt == 0:
-                    voice_player.play('high_temp_try_again')
+                    voice_player.play('tempmeter_high_retry')
                     try_cnt += 1
                     guide_state = False
                     temp_buffer.clear()
                     continue
                 elif try_cnt == 1:
-                    voice_player.play('high_temp_banned')
+                    voice_player.play('tempmeter_high_banned')
                     system_state = State.BARICADE_CLOSE
                     break
             else: #열이 나지 않는경우
+                voice_player.play('tempmeter_normal')
                 system_state = State.WAIT_SANITIZE_HAND
+                temperature_checked = True
                 break
 
     
 def on_wait_sanitize_hand():
     global system_state
+    global sanitizer_checked
 
-    voice_player.play('sanitizer_guide', join=False)
+    if sanitizer_checked == True:       #스킵
+        system_state = State.BARICADE_OPEN
+        return
+
+    voice_player.play('guide_sanitizer', join=False)
 
     while True:
         # 사용자가 사라지는지 모니터링
@@ -302,35 +336,50 @@ def on_wait_sanitize_hand():
         # 사용자가 손을 집어넣을때까지 기다림
         if expect(pir.detect, True, None):
             #손소독제 펌핑
-            servo_sanitizer.move(angle=10, smooth=3).move(angle=-10, smooth=0.2)
+            servo_sanitizer.move(angle=17, smooth=4).move(angle=-10, smooth=0.2)
             system_state = State.BARICADE_OPEN
+            sanitizer_checked = True
             break
         
         sleep(0.2)
 
 def on_baricade_open():
     global system_state
+    global mask_checked
+    global temperature_checked
+    global sanitizer_checked
 
-    voice_player.play('barricade_open', join=False)
-    servo_baricade.move(angle=90, smooth=2)
-
-
-    system_state = State.WAIT_PERSON_PASS
+    #모든 checked 상태 검사
+    if mask_checked == True and temperature_checked == True and sanitizer_checked == True:
+        voice_player.play('barricade_open')
+        servo_baricade.move(angle=90, smooth=2)
+        system_state = State.WAIT_PERSON_PASS
+    elif mask_checked == False:
+        system_state = State.WAIT_APPROCH_PERSON; 
+    elif temperature_checked == False:
+        system_state = State.WAIT_MEASURE_TEMP; 
+    elif sanitizer_checked == False:
+        system_state = State.WAIT_SANITIZE_HAND; 
 
 def on_person_pass():
     global system_state
-    if expect(ultrasonic_left.detect, True, None):
+
+    # 사람이 없어지는지 모니터링
+    if expect(ultrasonic_right.detect, False, when_person_vanish): return
+    elif expect(detect_mask, 'NO_MASK', when_mask_off): return  # 사용자가 마스크를 벗는지 모니터링
+    elif ultrasonic_left.detect() == True:
         while True:
-            if expect(ultrasonic_left.detect, False, None): break
-            sleep(0.2)
-        
+            if ultrasonic_left.detect() == False: break
+            sleep(0.05)
+
         voice_player.play('barricade_close')
         servo_baricade.move(angle=0, smooth=2)
 
         init_mask_factor()
         system_state = State.BARICADE_CLOSE
-# -------------------------------------------------------
 
+        sleep(5)
+# -------------------------------------------------------
 
 
 

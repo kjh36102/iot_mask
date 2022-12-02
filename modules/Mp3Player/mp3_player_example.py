@@ -1,7 +1,7 @@
 from Mp3Player import Mp3Player
 
-# path = '/home/iot/Desktop/iot_mask/TTS_records'   #절대경로
-path = './TTS_records'                              #iot_mask폴더 기준 상대경로
+path = '/home/iot/Desktop/iot_mask/TTS_records'   #절대경로
+# path = './TTS_records'                              #iot_mask폴더 기준 상대경로
 
 my_player = Mp3Player(path)
 

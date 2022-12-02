@@ -92,10 +92,7 @@ class __SocketConnection(StopableThread):
             if chr(1) in data_splited[i]:   #커맨드 식별자가 포함되어있으면
                 self._receive_action(data_splited[i])
             elif data_splited[i] != '':
-                # if len(self.receive_buffer[sender_ip]) < self.buffer_len:
-                    self.receive_buffer[sender_ip].append((sender_ip, self.my_ip, data_splited[i]))
-                # else:
-                #     log(self, f'{sender_ip} 을(를) 위한 수신버퍼가 꽉 찼습니다. 버린 데이터: {data_splited[i]}')
+                self.receive_buffer[sender_ip].append((sender_ip, self.my_ip, data_splited[i]))
 
         self.waiting_next_part = data_splited[-1]
 
@@ -115,7 +112,7 @@ class __SocketConnection(StopableThread):
             self.receive_buffer[sender_ip].clear()
 
     def _receive_action(self, decoded):
-        #자식클래스가 상속받아 작성
+        #자식클래스가 오버라이딩
         pass
 
 
@@ -236,9 +233,11 @@ class SocketClient(__SocketConnection):
             self.connections[self.host] = self.my_socket
 
             log(self, f'호스트 {self.host} 에 연결되었습니다.')
-            self.connect_state = True
 
             self.receive_buffer[self.host] = []
+            print('receive buffer on client connect to host:', self.receive_buffer)
+
+            self.connect_state = True
 
             self.receive_th = StopableThread(target=self._receive, args=(self.host, )).start()
         except ConnectionRefusedError:

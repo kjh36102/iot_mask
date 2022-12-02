@@ -71,7 +71,7 @@ class ServoDriver:
             while True:
                 self.servo.value = sin(radians(i))
                 i += sliced_angle
-                print('i:', i)
+                # print('i:', i)
                 if (sliced_angle < 0 and i < angle) or (sliced_angle > 0 and i > angle): break
                 sleep(0.005)
 
@@ -86,6 +86,8 @@ class ServoDriver:
             angle: 원하는 각도
             delay: 소요시간(None이면 최적의 시간 자동계산)
         '''
+        print('call move')
+
         self.command_buffer.append((angle, delay, smooth))  #command_buffer에 추가
 
         if self.thread_lock == False:   #스레드 시작

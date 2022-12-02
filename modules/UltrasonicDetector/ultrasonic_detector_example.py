@@ -19,13 +19,13 @@ GPIO.setwarnings(False)
 GPIO.setup(PIN_LED, GPIO.OUT)
 GPIO.setup(PIN_BUZZER, GPIO.OUT)
 
-sensor1 = UltrasonicDetector(echo=8, trig=7, detect_range=0.3, daemon_port=20001, name='sensor1', debug=True)
-sensor2 = UltrasonicDetector(echo=24, trig=23, detect_range=0.5, daemon_port=20001, name='sensor2', debug=True)
+sensor1 = UltrasonicDetector(echo=8, trig=7, detect_range=0.3, daemon_port=20001, name='sensor1', debug=True).start()
+sensor2 = UltrasonicDetector(echo=24, trig=23, detect_range=0.5, daemon_port=20001, name='sensor2', debug=True).start()
 
 def print_out():
     while True:
-        log(f'Distance1: {sensor1.distance():.2f}, Distance2: {sensor2.distance():.2f}')
-        log(f'in_range1: {sensor1.detect()}, in_range2: {sensor2.detect()}')
+        log(None, f'Distance1: {sensor1.distance():.2f}, Distance2: {sensor2.distance():.2f}')
+        log(None, f'in_range1: {sensor1.detect()}, in_range2: {sensor2.detect()}')
 
         GPIO.output(PIN_LED, sensor1.detect())
         GPIO.output(PIN_BUZZER, sensor2.detect())
