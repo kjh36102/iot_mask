@@ -3,6 +3,7 @@
 # USAGE
 # python detect_mask_video.py
 
+#http://192.168.1.5:8080/
 SENSOR_PI = '192.168.1.2'
 CAMERA_PI = '192.168.1.5'
 # import the necessary packages\
