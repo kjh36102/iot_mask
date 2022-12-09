@@ -1,8 +1,5 @@
 #pc에서 실행될 코드
 
-# USAGE
-# python detect_mask_video.py
-
 import sys
 
 #필요한 모듈 불러오기
@@ -96,7 +93,7 @@ print("[INFO] starting video stream...")
 vs = VideoStream("http://" + CAMERA_PI + ":8080/stream/video.mjpeg").start()
 #vs = VideoStream(src=0).start() #PC웹캠으로 테스트
 
-#메인 시작 -------------------------------------------
+#메인 시작 -----------------------------------------------------------------------
 time.sleep(2.0)
 
 #소켓통신 서버 시작
