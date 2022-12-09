@@ -384,6 +384,10 @@ def on_wait_measure_temp():
     guide_state = False
     try_cnt = 0 #체온높음 카운트
 
+    #재안내 카운튼
+    reguide_cnt = 0
+    reguide_max = 50
+
     while True:
         # 사용자가 사라지는지 모니터링
         if expect(ultrasonic_right.detect, False, when_person_vanish): break
@@ -398,11 +402,15 @@ def on_wait_measure_temp():
         temp = tempmeter.peek()[1]
         sleep(0.2)
 
+        reguide_cnt += 1
+
         if temp <= 30: 
-            if len(temp_buffer) != 0 and guide_state == True:   #체온측정하다 중단하면 안내 재생
+            if (len(temp_buffer) != 0 and guide_state == True) or reguide_cnt >= reguide_max:   #체온측정하다 중단하면 안내 재생
+                voice_player.last_played = ''
                 voice_player.play('guide_tempmeter')
                 guide_state = False
                 temp_buffer.clear()
+                reguide_cnt = 0
             continue #인간의 체온영역이 아니면 측정x
 
         #안내음성 재생 안했으면 재생하기
@@ -520,9 +528,19 @@ def on_person_pass():
 
     # 왼쪽 초음파에 감지되면 사라질때까지 대기
     if ultrasonic_left.detect() == True:
+
+        #오른쪽 초음파 민감하게 만들기
+        ultrasonic_right.queue_len = 1
+
+        #오른쪽 초음파에서 사라질때까지 기다리기
+        while True:
+            if ultrasonic_right.detect() == False: break
+            sleep(0.02)
+            
+        #왼쪽 초음파에서 사라질때까지 기다리기
         while True:
             if ultrasonic_left.detect() == False: break
-            sleep(0.05)
+            sleep(0.02)
 
         lcd.lcd_display_string('     [Watch out]    ', 2)
         lcd.lcd_display_string("Closing Barricade...", 3)
