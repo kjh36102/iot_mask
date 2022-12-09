@@ -288,7 +288,7 @@ def on_baricade_close():
     init_mask_factor()
 
     #우측 초음파 큐 사이즈 조절
-    ultrasonic_right.queue_len = 30
+    ultrasonic_right.queue_len=30
 
     #카메라 원위치
     servo_camera.move(0, smooth=2)
@@ -384,7 +384,7 @@ def on_wait_measure_temp():
     guide_state = False
     try_cnt = 0 #체온높음 카운트
 
-    #재안내 카운튼
+    #재안내 카운트
     reguide_cnt = 0
     reguide_max = 50
 
@@ -400,9 +400,6 @@ def on_wait_measure_temp():
         elif mask_label == 'NO_PERSON': when_no_person(); break
 
         temp = tempmeter.peek()[1]
-        sleep(0.2)
-
-        reguide_cnt += 1
 
         if temp <= 30: 
             if (len(temp_buffer) != 0 and guide_state == True) or reguide_cnt >= reguide_max:   #체온측정하다 중단하면 안내 재생
@@ -451,6 +448,9 @@ def on_wait_measure_temp():
                 system_state = State.WAIT_SANITIZE_HAND
                 temperature_checked = True
                 break
+        
+        reguide_cnt += 1
+        sleep(0.2)
 
     
 def on_wait_sanitize_hand():
@@ -466,6 +466,7 @@ def on_wait_sanitize_hand():
 
     voice_player.play('guide_sanitizer', join=False)
 
+    #재안내 카운트
     reguide_cnt = 0
     reguide_max = 50
 
@@ -541,6 +542,9 @@ def on_person_pass():
         while True:
             if ultrasonic_left.detect() == False: break
             sleep(0.02)
+
+        #오른쪽 초음파 둔감하게 하기
+        ultrasonic_right.queue_len = 30
 
         lcd.lcd_display_string('     [Watch out]    ', 2)
         lcd.lcd_display_string("Closing Barricade...", 3)
