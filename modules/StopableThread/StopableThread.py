@@ -1,6 +1,5 @@
 from threading import Thread
 import ctypes 
-import time
 
 class StopableThread(Thread): 
     def __init__(self, target=None, args=None): 
