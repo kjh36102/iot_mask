@@ -131,6 +131,7 @@ def detect_mask(voice=False):
         global mask_result_buffer
         global mask_result_avg
         global mask_last_label
+        global camera_servo_th  
 
         socket_client.send('PERSON_DETECTED', SOCKET_HOST)
 
@@ -156,10 +157,7 @@ def detect_mask(voice=False):
                 voice_player.play('mask_detect_start', join=False)
                 mask_last_label = label
                 mask_result_buffer.clear()
-
-    
-                    
-            global camera_servo_th  
+            
             # 값 맵핑
             if label == 'NO_PERSON':
                 mask_result_buffer.append(50)
@@ -218,6 +216,15 @@ def camera_seek_person():
     sleep(3)
     servo_camera.move(0, smooth=4)
     sleep(2)
+
+def stop_camera_servo():
+    global camera_servo_th
+
+    #카메라 움직이고 있다면 취소
+    if camera_servo_th != None:
+        servo_camera.stop_move()
+        camera_servo_th.stop()
+        camera_servo_th = None
 # ------------------------------------------------------------------------------------------
 
 # 모니터링 콜백 함수들 ------------------------------------------------------------------------
@@ -226,6 +233,7 @@ def when_person_vanish():
     global mask_result_buffer
     global camera_servo_th
     global system_state
+
     system_state = State.BARICADE_CLOSE
 
     lcd.lcd_display_string('  PROCESS CANCELED  ', 2)
@@ -234,12 +242,9 @@ def when_person_vanish():
     #문 닫기
     servo_baricade.move(0, smooth=3)
 
-    #카메라 움직이고 있다면 취소
-    if camera_servo_th != None:
-        servo_camera.stop_move()
-        camera_servo_th.stop()
-        camera_servo_th = None
+    stop_camera_servo()
 
+    #카메라 원위치
     servo_camera.move(0, smooth=4)
 
     voice_player.play('process_aborted')
@@ -263,6 +268,7 @@ def when_no_person():
     global mask_checked
 
     system_state = State.WAIT_APPROCH_PERSON
+
     mask_checked = False
 
     #문 닫기
@@ -277,9 +283,15 @@ def on_baricade_close():
     lcd.lcd_display_string('   Waiting user..   ', 2)
     lcd.lcd_display_string('                    ', 3)
 
+    #전역변수들 초기화
     clear_user_checks()
+    init_mask_factor()
 
+    #우측 초음파 큐 사이즈 조절
     ultrasonic_right.queue_len = 30
+
+    #카메라 원위치
+    servo_camera.move(0, smooth=2)
 
     #초음파센서 사람 없으면 패스
     while ultrasonic_right.detect() == False: pass
@@ -299,7 +311,7 @@ def on_wait_approach_person():
     global system_state
     global mask_checked
 
-    if mask_checked == True:    #이미 했으면 스킵
+    if mask_checked == True:    #마스크 착용 했으면 스킵
         system_state = State.WAIT_MEASURE_TEMP
         return
 
@@ -337,7 +349,9 @@ def on_wait_approach_person():
             lcd.lcd_display_string('Ur mask is detected!', 3)
 
             voice_player.play('mask_detected')
+
             system_state = State.WAIT_MEASURE_TEMP
+
             mask_checked = True
         elif res == 'NO_MASK':
             print('no mask')
@@ -347,14 +361,14 @@ def on_wait_approach_person():
 
             voice_player.play('mask_not_detected')
 
-        if res != 'None': break
+        if res != 'None': break #반복문 탈출 조건
         
 
 def on_wait_measure_temp():
     global system_state
     global temperature_checked
 
-    if temperature_checked == True:     #스킵
+    if temperature_checked == True:     #체온 측정했으면 스킵
         system_state = State.WAIT_SANITIZE_HAND
         return
 
@@ -363,10 +377,12 @@ def on_wait_measure_temp():
 
     voice_player.play('guide_tempmeter')
 
+    #체온 측정값 담는 버퍼
     temp_buffer = []
 
+    #안내음성 재생했는지 저장하는 변수
     guide_state = False
-    try_cnt = 0
+    try_cnt = 0 #체온높음 카운트
 
     while True:
         # 사용자가 사라지는지 모니터링
@@ -379,12 +395,17 @@ def on_wait_measure_temp():
         # 사용자가 카메라에서 사라지는지 모니터링
         elif mask_label == 'NO_PERSON': when_no_person(); break
 
-
-
         temp = tempmeter.peek()[1]
+        sleep(0.2)
 
-        if temp <= 30: continue
+        if temp <= 30: 
+            if len(temp_buffer) != 0 and guide_state == True:   #체온측정하다 중단하면 안내 재생
+                voice_player.play('guide_tempmeter')
+                guide_state = False
+                temp_buffer.clear()
+            continue #인간의 체온영역이 아니면 측정x
 
+        #안내음성 재생 안했으면 재생하기
         if guide_state == False:
             lcd.lcd_display_string('   [Temp measure]   ', 2)
             lcd.lcd_display_string(' Start measuring... ', 3)
@@ -392,10 +413,11 @@ def on_wait_measure_temp():
             voice_player.play('tempmeter_measure_start', join=False)
             guide_state = True
 
-        temp_buffer.append(temp)
+        temp_buffer.append(temp)    #체온 값 버퍼에 추가
 
+        #체온값이 BUFFER_MAX 이상으로 쌓이면
         if len(temp_buffer) >= TEMP_BUFFER_MAX:
-            avg = sum(temp_buffer) / TEMP_BUFFER_MAX
+            avg = sum(temp_buffer) / TEMP_BUFFER_MAX    #평균 구하기
 
             if avg > tempmeter.detect_temp: #열이 나는경우
                 if try_cnt == 0:
@@ -407,7 +429,7 @@ def on_wait_measure_temp():
                     guide_state = False
                     temp_buffer.clear()
                     continue
-                elif try_cnt == 1:
+                elif try_cnt == 1:  #재측정하는 경우
                     lcd.lcd_display_string('   [Temp measure]   ', 2)
                     lcd.lcd_display_string("Sorry, U can't enter", 3)
                     voice_player.play('tempmeter_high_banned')
@@ -422,14 +444,12 @@ def on_wait_measure_temp():
                 temperature_checked = True
                 break
 
-        sleep(0.2)
-
     
 def on_wait_sanitize_hand():
     global system_state
     global sanitizer_checked
 
-    if sanitizer_checked == True:       #스킵
+    if sanitizer_checked == True:       #손소독제 받았으면 스킵
         system_state = State.BARICADE_OPEN
         return
 
@@ -437,6 +457,9 @@ def on_wait_sanitize_hand():
     lcd.lcd_display_string(" Plz get sanitizer! ", 3)
 
     voice_player.play('guide_sanitizer', join=False)
+
+    reguide_cnt = 0
+    reguide_max = 50
 
     while True:
         # 사용자가 사라지는지 모니터링
@@ -449,6 +472,11 @@ def on_wait_sanitize_hand():
         # 사용자가 카메라에서 사라지는지 모니터링
         elif mask_label == 'NO_PERSON': when_no_person(); break
 
+        if reguide_cnt >= reguide_max:  #손을 안넣으면 안내음 다시 재생
+            voice_player.last_played=''
+            voice_player.play('guide_sanitizer', join=False)
+            reguide_cnt = 0
+
         # 사용자가 손을 집어넣을때까지 기다림
         if expect(pir.detect, True, None):
             #손소독제 펌핑
@@ -456,7 +484,8 @@ def on_wait_sanitize_hand():
             system_state = State.BARICADE_OPEN
             sanitizer_checked = True
             break
-        
+
+        reguide_cnt += 1
         sleep(0.2)
 
 def on_baricade_open():
@@ -466,18 +495,18 @@ def on_baricade_open():
     global sanitizer_checked
 
     #모든 checked 상태 검사
-    if mask_checked == True and temperature_checked == True and sanitizer_checked == True:
+    if mask_checked == True and temperature_checked == True and sanitizer_checked == True:  #모두 확인된 경우
         lcd.lcd_display_string('     [Very Good]    ', 2)
         lcd.lcd_display_string("Opening Barricade...", 3)
 
         voice_player.play('barricade_open')
-        servo_baricade.move(angle=90, smooth=2)
+        servo_baricade.move(angle=90, smooth=2) #문열기
         system_state = State.WAIT_PERSON_PASS
-    elif mask_checked == False:
+    elif mask_checked == False: #마스크 확인 안된경우
         system_state = State.WAIT_APPROCH_PERSON; 
-    elif temperature_checked == False:
+    elif temperature_checked == False:  #체온 측정 안된경우
         system_state = State.WAIT_MEASURE_TEMP; 
-    elif sanitizer_checked == False:
+    elif sanitizer_checked == False:    # 손소독 안한 경우
         system_state = State.WAIT_SANITIZE_HAND; 
 
 def on_person_pass():
@@ -486,13 +515,10 @@ def on_person_pass():
     # 사람이 없어지는지 모니터링
     if expect(ultrasonic_right.detect, False, when_person_vanish): return
 
-    mask_label = detect_mask()
-
     # 사용자가 마스크를 벗는지 모니터링
-    if mask_label == 'NO_MASK': when_mask_off(); return
-    # 사용자가 카메라에서 사라지는지 모니터링
-    elif mask_label == 'NO_PERSON': when_no_person(); return
-    
+    if expect(detect_mask, 'NO_MASK', when_mask_off): return
+
+    # 왼쪽 초음파에 감지되면 사라질때까지 대기
     if ultrasonic_left.detect() == True:
         while True:
             if ultrasonic_left.detect() == False: break
@@ -502,9 +528,8 @@ def on_person_pass():
         lcd.lcd_display_string("Closing Barricade...", 3)
 
         voice_player.play('barricade_close')
-        servo_baricade.move(angle=0, smooth=3)
+        servo_baricade.move(angle=0, smooth=3)  #문 닫기
 
-        init_mask_factor()
         system_state = State.BARICADE_CLOSE
 
         sleep(5)
