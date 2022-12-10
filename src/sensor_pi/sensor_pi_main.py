@@ -527,34 +527,31 @@ def on_person_pass():
     # 사용자가 마스크를 벗는지 모니터링
     if expect(detect_mask, 'NO_MASK', when_mask_off): return
 
-    # 왼쪽 초음파에 감지되면 사라질때까지 대기
-    if ultrasonic_left.detect() == True:
+    #오른쪽 초음파 민감하게 만들기
+    ultrasonic_right.queue_len = 1
 
-        #오른쪽 초음파 민감하게 만들기
-        ultrasonic_right.queue_len = 1
+    #오른쪽 초음파에서 사라질때까지 기다리기
+    while True:
+        if ultrasonic_right.detect() == False: break
+        sleep(0.02)
+        
+    #왼쪽 초음파에서 사라질때까지 기다리기
+    while True:
+        if ultrasonic_left.detect() == False: break
+        sleep(0.02)
 
-        #오른쪽 초음파에서 사라질때까지 기다리기
-        while True:
-            if ultrasonic_right.detect() == False: break
-            sleep(0.02)
-            
-        #왼쪽 초음파에서 사라질때까지 기다리기
-        while True:
-            if ultrasonic_left.detect() == False: break
-            sleep(0.02)
+    #오른쪽 초음파 둔감하게 하기
+    ultrasonic_right.queue_len = 30
 
-        #오른쪽 초음파 둔감하게 하기
-        ultrasonic_right.queue_len = 30
+    lcd.lcd_display_string('     [Watch out]    ', 2)
+    lcd.lcd_display_string("Closing Barricade...", 3)
 
-        lcd.lcd_display_string('     [Watch out]    ', 2)
-        lcd.lcd_display_string("Closing Barricade...", 3)
+    voice_player.play('barricade_close')
+    servo_baricade.move(angle=0, smooth=3)  #문 닫기
 
-        voice_player.play('barricade_close')
-        servo_baricade.move(angle=0, smooth=3)  #문 닫기
+    system_state = State.BARICADE_CLOSE
 
-        system_state = State.BARICADE_CLOSE
-
-        sleep(5)
+    sleep(5)
 # -------------------------------------------------------
 
 

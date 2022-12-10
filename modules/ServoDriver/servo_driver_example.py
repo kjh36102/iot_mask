@@ -4,7 +4,7 @@
 from ServoDriver import ServoDriver
 import time
 
-servo1_pin = 13
+servo1_pin = 18
 
 servo1 = ServoDriver(servo1_pin, init_angle=0, daemon_port=20001).start()
 smooth = 1
