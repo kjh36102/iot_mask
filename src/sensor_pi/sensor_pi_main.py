@@ -55,12 +55,12 @@ socket_client = SocketClient(host=SOCKET_HOST, port=SOCKET_PORT, debug=True).sta
 voice_player = Mp3Player('./TTS_records')
 ultrasonic_left = UltrasonicDetector(
     echo=PIN_HYPER_LEFT_ECHO, trig=PIN_HYPER_LEFT_TRIG, 
-    detect_range=0.5, max_range=0.6, queue_len=1, daemon_port=PIGPIOD_PORT,
+    detect_range=0.4, max_range=0.6, queue_len=1, daemon_port=PIGPIOD_PORT,
     name='left', debug=False
 ).start()
 ultrasonic_right = UltrasonicDetector(
     echo=PIN_HYPER_RIGHT_ECHO, trig=PIN_HYPER_RIGHT_TRIG,
-    detect_range=0.6, max_range=1, queue_len=30,
+    detect_range=0.5, max_range=1, queue_len=30,
     daemon_port=PIGPIOD_PORT, name='right', debug=False
 ).start()
 servo_baricade = ServoDriver(
@@ -508,6 +508,8 @@ def on_baricade_open():
         lcd.lcd_display_string('     [Very Good]    ', 2)
         lcd.lcd_display_string("Opening Barricade...", 3)
 
+        print('mask_checked:', mask_checked, 'temp_check:', temperature_checked, 'sanitizer_check:', sanitizer_checked)
+
         voice_player.play('barricade_open')
         servo_baricade.move(angle=90, smooth=2) #문열기
         system_state = State.WAIT_PERSON_PASS
@@ -533,12 +535,12 @@ def on_person_pass():
     #오른쪽 초음파에서 사라질때까지 기다리기
     while True:
         if ultrasonic_right.detect() == False: break
-        sleep(0.02)
-        
+        sleep(0.01)
+
     #왼쪽 초음파에서 사라질때까지 기다리기
     while True:
         if ultrasonic_left.detect() == False: break
-        sleep(0.02)
+        sleep(0.01)
 
     #오른쪽 초음파 둔감하게 하기
     ultrasonic_right.queue_len = 30
