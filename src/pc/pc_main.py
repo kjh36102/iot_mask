@@ -11,8 +11,8 @@ sys.path.append('./modules/SocketConnection')
 #webrtc 들어가서 call, hang up 한번씩 눌러주기 (스트리밍 보는장치 다 끄고)
 
 #주소
-SENSOR_PI = '192.168.1.2'
-CAMERA_PI = '192.168.1.5'
+SENSOR_PI = '192.168.1.3'
+CAMERA_PI = '192.168.1.4'
 
 # import the necessary packages\
 from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
